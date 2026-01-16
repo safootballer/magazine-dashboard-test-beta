@@ -752,7 +752,7 @@ Write the magazine match report now.
             )
 
             with st.spinner("✨ Generating professional content..."):
-                result = chain.invoke({})
+                result = chain.invoke("Generate a match report")
                 
                 st.markdown("## 📄 Generated Content")
                 
