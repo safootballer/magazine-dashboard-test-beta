@@ -9,7 +9,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from langchain_community.vectorstores import InMemoryVectorStore
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain.chains.retrieval_qa.base import RetrievalQA
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
 
 
 # --------------------------------------------------
@@ -679,19 +681,14 @@ def main_app():
                 max_tokens=1200
             )
 
-            qa = RetrievalQA.from_chain_type(
-                llm=llm,
-                chain_type="stuff",
-                retriever=st.session_state.vectordb.as_retriever(k=6)
-            )
+            retriever = st.session_state.vectordb.as_retriever(k=6)
             
-            prompt = """
+            prompt_text = """
 You are a professional Australian football journalist writing for a print magazine.
 
 You MUST follow this structure exactly.
 
 STRUCTURE:
-
 
 1. Opening Paragraph
 - Mention venue and match context
@@ -736,11 +733,26 @@ LENGTH REQUIREMENT:
 - Do not exceed 950 words
 - Do not go below 700 words
 
+Context: {context}
+
 Write the magazine match report now.
 """
 
+            prompt_template = ChatPromptTemplate.from_template(prompt_text)
+            
+            def format_docs(docs):
+                return "\n\n".join([d.page_content for d in docs])
+            
+            # Modern chain using LCEL
+            chain = (
+                {"context": retriever | format_docs}
+                | prompt_template
+                | llm
+                | StrOutputParser()
+            )
+
             with st.spinner("✨ Generating professional content..."):
-                result = qa.run(prompt)
+                result = chain.invoke({})
                 
                 st.markdown("## 📄 Generated Content")
                 
