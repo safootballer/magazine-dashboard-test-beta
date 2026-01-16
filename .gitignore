@@ -10,8 +10,6 @@
 # -----------------------
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
 
 # -----------------------
 # Virtual environments
@@ -28,9 +26,10 @@ env/
 # -----------------------
 # Databases
 # -----------------------
-*.db
 *.sqlite
 *.sqlite3
+*.db
+!magazine.db   # <-- allow THIS database
 
 # -----------------------
 # OS / Editor junk
@@ -39,8 +38,3 @@ env/
 Thumbs.db
 .vscode/
 .idea/
-
-# -----------------------
-# Logs
-# -----------------------
-*.log
