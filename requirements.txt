@@ -4,7 +4,3 @@ python-dotenv
 langchain
 langchain-community
 langchain-openai
-sqlite3
-json
-hashlib
-datetime
