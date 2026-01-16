@@ -1,6 +1,8 @@
-streamlit>=1.30,<1.40
+streamlit
 requests
 python-dotenv
-langchain==0.0.354
+langchain
 langchain-community
 langchain-openai
+langchain-text-splitters
+langchain-core
