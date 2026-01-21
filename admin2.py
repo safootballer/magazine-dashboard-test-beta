@@ -1,9 +1,66 @@
 import streamlit as st
-import sqlite3
 import hashlib
 import json
 import pandas as pd
+import os
 from datetime import datetime
+from dotenv import load_dotenv
+from sqlalchemy import create_engine, Column, Integer, String, Text, func
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+# --------------------------------------------------
+# Init
+# --------------------------------------------------
+load_dotenv()
+
+# --------------------------------------------------
+# Database Setup with PostgreSQL
+# --------------------------------------------------
+DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///magazine.db')
+
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+Base = declarative_base()
+
+class Match(Base):
+    __tablename__ = 'matches'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    match_id = Column(String(255), unique=True)
+    extracted_at = Column(String(255))
+    date = Column(String(255))
+    competition = Column(String(255))
+    venue = Column(String(255))
+    home_team = Column(String(255))
+    away_team = Column(String(255))
+    home_final_score = Column(Integer)
+    away_final_score = Column(Integer)
+    margin = Column(Integer)
+    quarter_scores = Column(Text)
+    lineups = Column(Text)
+    goal_scorers = Column(Text)
+
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(255), unique=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    role = Column(String(50), nullable=False)
+    created_at = Column(String(255))
+    last_login = Column(String(255))
+
+Base.metadata.create_all(engine)
+SessionLocal = sessionmaker(bind=engine)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        return db
+    except Exception as e:
+        db.close()
+        raise e
 
 # --------------------------------------------------
 # Page Config
@@ -15,10 +72,79 @@ st.set_page_config(
 )
 
 # --------------------------------------------------
-# Database Connection
+# Custom CSS
 # --------------------------------------------------
-conn = sqlite3.connect("magazine.db", check_same_thread=False)
-cur = conn.cursor()
+st.markdown("""
+<style>
+.stApp {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+}
+
+/* Cards */
+.metric-card {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 1.5rem;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: #059669;
+    margin: 0.5rem 0;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Headers */
+h1, h2, h3 {
+    color: white !important;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+}
+
+section[data-testid="stSidebar"] * {
+    color: white !important;
+}
+
+/* Tables */
+.stDataFrame {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+/* Buttons */
+.stButton>button {
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.stButton>button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+}
+
+/* Expanders */
+.streamlit-expanderHeader {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-radius: 12px !important;
+    font-weight: 600;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # --------------------------------------------------
 # Auth Functions
@@ -27,43 +153,58 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 def verify_admin_login(username, password):
-    password_hash = hash_password(password)
-    result = cur.execute("""
-        SELECT id, username, role FROM users 
-        WHERE username = ? AND password_hash = ? AND role = 'admin'
-    """, (username, password_hash)).fetchone()
+    db = get_db()
+    try:
+        password_hash = hash_password(password)
+        user = db.query(User).filter_by(
+            username=username, 
+            password_hash=password_hash, 
+            role='admin'
+        ).first()
 
-    if result:
-        cur.execute("""
-            UPDATE users SET last_login = ? WHERE id = ?
-        """, (datetime.utcnow().isoformat(), result[0]))
-        conn.commit()
-        return {"id": result[0], "username": result[1], "role": result[2]}
-    return None
+        if user:
+            user.last_login = datetime.utcnow().isoformat()
+            db.commit()
+            return {"id": user.id, "username": user.username, "role": user.role}
+        return None
+    except Exception as e:
+        print(f"Login error: {e}")
+        return None
+    finally:
+        db.close()
 
 # --------------------------------------------------
 # Login Page
 # --------------------------------------------------
 def login_page():
-    st.title("⚙️ Admin Dashboard Login")
+    st.markdown("<h1 style='text-align: center; margin-top: 3rem;'>⚙️ Admin Dashboard</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #94a3b8; font-size: 1.1rem;'>Administrator Access Only</p>", unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown("### Administrator Access Only")
-        username = st.text_input("Admin Username")
-        password = st.text_input("Password", type="password")
+        st.markdown("<div style='background: rgba(255,255,255,0.95); padding: 2rem; border-radius: 16px; margin-top: 2rem;'>", unsafe_allow_html=True)
+        
+        username = st.text_input("🔐 Admin Username", placeholder="Enter username")
+        password = st.text_input("🔑 Password", type="password", placeholder="Enter password")
 
-        if st.button("Login", use_container_width=True):
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        if st.button("🚀 Login to Dashboard", use_container_width=True, type="primary"):
             admin = verify_admin_login(username, password)
             if admin:
                 st.session_state.admin_logged_in = True
                 st.session_state.admin = admin
-                st.success(f"Welcome, {admin['username']}!")
+                st.success(f"✅ Welcome, {admin['username']}!")
+                st.balloons()
                 st.rerun()
             else:
-                st.error("Invalid credentials or insufficient permissions")
+                st.error("❌ Invalid credentials or insufficient permissions")
 
-        st.info("**Default:** admin / admin123")
+        st.markdown("<br>", unsafe_allow_html=True)
+        with st.expander("ℹ️ Default Credentials"):
+            st.code("Username: admin\nPassword: admin123")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
 
 def logout():
     st.session_state.admin_logged_in = False
@@ -74,171 +215,331 @@ def logout():
 # Dashboard Pages
 # --------------------------------------------------
 def show_statistics():
-    st.header("📊 System Overview")
+    st.markdown("## 📊 System Overview")
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    db = get_db()
+    try:
+        total_users = db.query(User).count()
+        total_matches = db.query(Match).count()
+        admin_count = db.query(User).filter_by(role='admin').count()
+    finally:
+        db.close()
 
     col1, col2, col3 = st.columns(3)
 
-    total_users = cur.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    col1.metric("Total Users", total_users)
+    with col1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div style="font-size: 2.5rem;">👥</div>
+            <div class="stat-number">{total_users}</div>
+            <div class="stat-label">Total Users</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    total_matches = cur.execute("SELECT COUNT(*) FROM matches").fetchone()[0]
-    col2.metric("Total Matches", total_matches)
+    with col2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div style="font-size: 2.5rem;">🏈</div>
+            <div class="stat-number">{total_matches}</div>
+            <div class="stat-label">Total Matches</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    recent_matches = cur.execute("""
-        SELECT COUNT(*) FROM matches 
-        WHERE extracted_at >= datetime('now', '-7 days')
-    """).fetchone()[0]
-    col3.metric("Matches (Last 7 Days)", recent_matches)
+    with col3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div style="font-size: 2.5rem;">⚙️</div>
+            <div class="stat-number">{admin_count}</div>
+            <div class="stat-label">Administrators</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<br><br>", unsafe_allow_html=True)
+
+    # Recent Activity
+    st.markdown("### 📋 Recent Activity")
+    
+    db = get_db()
+    try:
+        recent_matches = db.query(Match).order_by(Match.extracted_at.desc()).limit(5).all()
+        
+        if recent_matches:
+            for match in recent_matches:
+                with st.expander(f"🏈 {match.home_team} vs {match.away_team} - {match.date}"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(f"**Competition:** {match.competition}")
+                        st.write(f"**Venue:** {match.venue}")
+                    with col2:
+                        st.write(f"**Final Score:** {match.home_final_score} - {match.away_final_score}")
+                        st.write(f"**Margin:** {match.margin} points")
+        else:
+            st.info("No matches recorded yet")
+    finally:
+        db.close()
 
 # --------------------------------------------------
-# Analytics (GRAPHS)
+# Analytics
 # --------------------------------------------------
 def show_analytics():
-    st.header("📈 Analytics & Insights")
+    st.markdown("## 📈 Analytics & Insights")
 
-    # Matches over time
-    st.subheader("🏈 Matches Created Over Time")
-    df = pd.read_sql("""
-        SELECT date(extracted_at) AS day, COUNT(*) AS total
-        FROM matches
-        GROUP BY day
-        ORDER BY day
-    """, conn)
+    db = get_db()
+    
+    try:
+        # Matches by competition
+        st.markdown("### 🏆 Matches by Competition")
+        
+        results = db.query(
+            Match.competition, 
+            func.count(Match.id).label('total')
+        ).group_by(Match.competition).all()
+        
+        if results:
+            df = pd.DataFrame(results, columns=['competition', 'total'])
+            st.bar_chart(df.set_index('competition'))
+        else:
+            st.info("No competition data available")
 
-    if not df.empty:
-        df["day"] = pd.to_datetime(df["day"])
-        st.line_chart(df.set_index("day"))
-    else:
-        st.info("No match data available")
+        st.divider()
 
-    st.divider()
+        # User roles distribution
+        st.markdown("### 👥 User Roles Distribution")
+        
+        user_results = db.query(
+            User.role, 
+            func.count(User.id).label('total')
+        ).group_by(User.role).all()
+        
+        if user_results:
+            df_users = pd.DataFrame(user_results, columns=['role', 'total'])
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.bar_chart(df_users.set_index('role'))
+            with col2:
+                for role, count in user_results:
+                    st.metric(f"{role.upper()}", count)
+        else:
+            st.info("No user data available")
 
-    # Matches by competition
-    st.subheader("🏆 Matches by Competition")
-    df = pd.read_sql("""
-        SELECT competition, COUNT(*) AS total
-        FROM matches
-        GROUP BY competition
-        ORDER BY total DESC
-    """, conn)
+        st.divider()
 
-    if not df.empty:
-        st.bar_chart(df.set_index("competition"))
-    else:
-        st.info("No competition data available")
+        # Top venues
+        st.markdown("### 🏟️ Top Venues")
+        
+        venue_results = db.query(
+            Match.venue, 
+            func.count(Match.id).label('total')
+        ).group_by(Match.venue).order_by(func.count(Match.id).desc()).limit(10).all()
+        
+        if venue_results:
+            df_venues = pd.DataFrame(venue_results, columns=['venue', 'total'])
+            st.dataframe(df_venues, use_container_width=True, hide_index=True)
+        else:
+            st.info("No venue data available")
 
-    st.divider()
-
-    # User roles
-    st.subheader("👥 User Roles Distribution")
-    df = pd.read_sql("""
-        SELECT role, COUNT(*) AS total
-        FROM users
-        GROUP BY role
-    """, conn)
-
-    if not df.empty:
-        st.bar_chart(df.set_index("role"))
-    else:
-        st.info("No user data available")
+    finally:
+        db.close()
 
 # --------------------------------------------------
 # User Management
 # --------------------------------------------------
 def manage_users():
-    st.header("👥 User Management")
+    st.markdown("## 👥 User Management")
 
-    with st.expander("➕ Add New User"):
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        role = st.selectbox("Role", ["user", "admin"])
+    with st.expander("➕ Add New User", expanded=False):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            username = st.text_input("Username")
+            role = st.selectbox("Role", ["user", "admin"])
+        
+        with col2:
+            password = st.text_input("Password", type="password")
+            st.markdown("<br>", unsafe_allow_html=True)
 
-        if st.button("Create User"):
+        if st.button("✅ Create User", type="primary"):
             if username and password:
+                db = get_db()
                 try:
-                    cur.execute("""
-                        INSERT INTO users (username, password_hash, role, created_at)
-                        VALUES (?, ?, ?, ?)
-                    """, (username, hash_password(password), role, datetime.utcnow().isoformat()))
-                    conn.commit()
-                    st.success("User created successfully")
-                    st.rerun()
-                except sqlite3.IntegrityError:
-                    st.error("Username already exists")
+                    existing = db.query(User).filter_by(username=username).first()
+                    if existing:
+                        st.error("❌ Username already exists")
+                    else:
+                        new_user = User(
+                            username=username,
+                            password_hash=hash_password(password),
+                            role=role,
+                            created_at=datetime.utcnow().isoformat()
+                        )
+                        db.add(new_user)
+                        db.commit()
+                        st.success(f"✅ User '{username}' created successfully!")
+                        st.rerun()
+                except Exception as e:
+                    db.rollback()
+                    st.error(f"Error: {e}")
+                finally:
+                    db.close()
             else:
-                st.error("Fill all fields")
+                st.error("⚠️ Please fill all fields")
 
     st.divider()
+    st.markdown("### 📋 All Users")
 
-    users = cur.execute("""
-        SELECT id, username, role, created_at, last_login
-        FROM users
-        ORDER BY created_at DESC
-    """).fetchall()
+    db = get_db()
+    try:
+        users = db.query(User).order_by(User.created_at.desc()).all()
 
-    for u in users:
-        col1, col2, col3, col4, col5 = st.columns([2, 1, 2, 2, 1])
-        col1.write(f"**{u[1]}**")
-        col2.write(u[2])
-        col3.write(u[3][:10] if u[3] else "N/A")
-        col4.write(u[4][:10] if u[4] else "Never")
+        if users:
+            # Header
+            col1, col2, col3, col4, col5 = st.columns([2, 1, 2, 2, 1])
+            col1.markdown("**👤 Username**")
+            col2.markdown("**🎭 Role**")
+            col3.markdown("**📅 Created**")
+            col4.markdown("**🕐 Last Login**")
+            col5.markdown("**⚙️ Action**")
+            
+            st.divider()
 
-        with col5:
-            if u[1] != "admin":
-                if st.button("🗑️", key=f"del_{u[0]}"):
-                    cur.execute("DELETE FROM users WHERE id=?", (u[0],))
-                    conn.commit()
-                    st.rerun()
+            # Users list
+            for user in users:
+                col1, col2, col3, col4, col5 = st.columns([2, 1, 2, 2, 1])
+                
+                col1.write(f"**{user.username}**")
+                
+                if user.role == 'admin':
+                    col2.markdown("🔴 **Admin**")
+                else:
+                    col2.write("🟢 User")
+                
+                col3.write(user.created_at[:10] if user.created_at else "N/A")
+                col4.write(user.last_login[:10] if user.last_login else "Never")
+
+                with col5:
+                    if user.username != "admin":
+                        if st.button("🗑️", key=f"del_{user.id}"):
+                            db_del = get_db()
+                            try:
+                                user_to_delete = db_del.query(User).filter_by(id=user.id).first()
+                                if user_to_delete:
+                                    db_del.delete(user_to_delete)
+                                    db_del.commit()
+                                    st.success("User deleted!")
+                                    st.rerun()
+                            finally:
+                                db_del.close()
+                    else:
+                        col5.write("🔒")
+        else:
+            st.info("No users found")
+    finally:
+        db.close()
 
 # --------------------------------------------------
 # Match Management
 # --------------------------------------------------
 def manage_matches():
-    st.header("🏈 Match Management")
+    st.markdown("## 🏈 Match Management")
 
-    matches = cur.execute("""
-        SELECT id, home_team, away_team, date, competition, venue,
-               home_final_score, away_final_score, goal_scorers
-        FROM matches
-        ORDER BY date DESC
-    """).fetchall()
+    db = get_db()
+    try:
+        total_matches = db.query(Match).count()
+        st.markdown(f"**Total Matches:** {total_matches}")
+        
+        st.divider()
 
-    for m in matches:
-        with st.expander(f"{m[1]} vs {m[2]} ({m[3]})"):
-            st.write(f"**Competition:** {m[4]}")
-            st.write(f"**Venue:** {m[5]}")
-            st.write(f"**Score:** {m[1]} {m[6]} – {m[2]} {m[7]}")
+        matches = db.query(Match).order_by(Match.date.desc()).all()
 
-            scorers = json.loads(m[8])
-            st.write("**Goal Scorers:**")
-            st.write(scorers)
+        if matches:
+            for match in matches:
+                with st.expander(f"🏈 {match.home_team} vs {match.away_team} ({match.date})"):
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.write(f"**Competition:** {match.competition}")
+                        st.write(f"**Venue:** {match.venue}")
+                        st.write(f"**Date:** {match.date}")
+                    
+                    with col2:
+                        st.write(f"**Final Score:** {match.home_team} {match.home_final_score} – {match.away_team} {match.away_final_score}")
+                        st.write(f"**Margin:** {match.margin} points")
 
-            if st.button("🗑️ Delete Match", key=f"match_{m[0]}"):
-                cur.execute("DELETE FROM matches WHERE id=?", (m[0],))
-                conn.commit()
-                st.rerun()
+                    st.divider()
+
+                    # Quarter scores
+                    if match.quarter_scores:
+                        quarter_data = json.loads(match.quarter_scores)
+                        st.write("**Quarter Scores:**")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write(f"**{match.home_team}:**")
+                            for q, score in quarter_data.get('home', {}).items():
+                                st.write(f"{q}: {score}")
+                        with col2:
+                            st.write(f"**{match.away_team}:**")
+                            for q, score in quarter_data.get('away', {}).items():
+                                st.write(f"{q}: {score}")
+
+                    # Goal scorers
+                    if match.goal_scorers:
+                        scorers = json.loads(match.goal_scorers)
+                        st.write("**Goal Scorers:**")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write(f"**{match.home_team}:**")
+                            st.write(", ".join(scorers.get('home', [])) if scorers.get('home') else "None")
+                        with col2:
+                            st.write(f"**{match.away_team}:**")
+                            st.write(", ".join(scorers.get('away', [])) if scorers.get('away') else "None")
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    
+                    if st.button("🗑️ Delete Match", key=f"match_{match.id}", type="secondary"):
+                        db_del = get_db()
+                        try:
+                            match_to_delete = db_del.query(Match).filter_by(id=match.id).first()
+                            if match_to_delete:
+                                db_del.delete(match_to_delete)
+                                db_del.commit()
+                                st.success("Match deleted!")
+                                st.rerun()
+                        finally:
+                            db_del.close()
+        else:
+            st.info("No matches found")
+    finally:
+        db.close()
 
 # --------------------------------------------------
 # Admin Dashboard
 # --------------------------------------------------
 def admin_dashboard():
-    st.title("⚙️ Admin Dashboard")
-
-    col1, col2 = st.columns([3, 1])
+    # Header
+    col1, col2 = st.columns([4, 1])
     with col1:
-        st.write(f"👤 Logged in as **{st.session_state.admin['username']}**")
+        st.markdown("# ⚙️ Admin Dashboard")
+        st.markdown(f"Welcome back, **{st.session_state.admin['username']}** 👋")
     with col2:
-        if st.button("🚪 Logout"):
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🚪 Logout", use_container_width=True):
             logout()
 
     st.divider()
 
-    st.sidebar.title("📋 Navigation")
+    # Sidebar Navigation
+    st.sidebar.markdown("## 📋 Navigation")
+    st.sidebar.markdown("<br>", unsafe_allow_html=True)
+    
     page = st.sidebar.radio(
         "Select Page",
-        ["📊 Dashboard", "📈 Analytics", "👥 Users", "🏈 Matches"]
+        ["📊 Dashboard", "📈 Analytics", "👥 Users", "🏈 Matches"],
+        label_visibility="collapsed"
     )
 
+    # Page routing
     if page == "📊 Dashboard":
         show_statistics()
     elif page == "📈 Analytics":
