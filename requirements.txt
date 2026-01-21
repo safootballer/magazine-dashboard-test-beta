@@ -8,3 +8,4 @@ langchain-text-splitters
 langchain-core
 psycopg2-binary
 sqlalchemy
+pandas
