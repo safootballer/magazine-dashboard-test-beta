@@ -6,3 +6,5 @@ langchain-community
 langchain-openai
 langchain-text-splitters
 langchain-core
+psycopg2-binary
+sqlalchemy
