@@ -5,16 +5,16 @@ import hashlib
 import os
 from datetime import datetime
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String, Text
+from sqlalchemy import create_engine, Column, Integer, String, Text, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_core.documents import Document
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.schema import Document
 from langchain_community.vectorstores import InMemoryVectorStore
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-
+from langchain.callbacks import get_openai_callback
 
 # --------------------------------------------------
 # Init
@@ -52,6 +52,7 @@ class Match(Base):
     quarter_scores = Column(Text)
     lineups = Column(Text)
     goal_scorers = Column(Text)
+    best_players = Column(Text)
 
 class User(Base):
     __tablename__ = 'users'
@@ -61,6 +62,19 @@ class User(Base):
     role = Column(String(50), nullable=False)
     created_at = Column(String(255))
     last_login = Column(String(255))
+
+class GenerationCost(Base):
+    __tablename__ = 'generation_costs'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer)
+    match_id = Column(String(255))
+    content_type = Column(String(255))
+    prompt_tokens = Column(Integer)
+    completion_tokens = Column(Integer)
+    total_tokens = Column(Integer)
+    cost_usd = Column(Float)
+    model = Column(String(100))
+    generated_at = Column(String(255))
 
 # Create tables
 Base.metadata.create_all(engine)
@@ -88,96 +102,34 @@ st.set_page_config(
 # --------------------------------------------------
 st.markdown("""
 <style>
-
-/* REMOVE DEFAULT STREAMLIT TOP GAP */
-section[data-testid="stAppViewContainer"] {
-    padding-top: 0.5rem !important;
-}
-
-/* REMOVE EMPTY WHITE BLOCKS (IMPORTANT FIX) */
-div[data-testid="stVerticalBlock"]:empty {
-    display: none !important;
-}
-
-div[data-testid="stVerticalBlock"] > div:empty {
-    display: none !important;
-}
-
-/* MAIN BACKGROUND */
-.stApp {
-    background: linear-gradient(135deg, #059669 0%, #a3e635 100%);
-}
-
-/* LOGO WRAPPER */
-.logo-wrapper {
-    margin-top: 0.5rem;
-    margin-bottom: 1.2rem;
-}
-
-/* LOGIN CARD */
-.login-card {
-    background: rgba(255, 255, 255, 0.96);
-    padding: 3rem;
-    border-radius: 24px;
-    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.25);
-    max-width: 460px;
-    margin: 1.5rem auto 3rem auto;
-}
-
-/* REMOVE ANY CONTAINER BACKGROUND */
-.stContainer {
-    background: transparent !important;
-}
-
-/* TITLES */
-.big-title {
-    font-size: 3.1rem;
-    font-weight: 800;
-    text-align: center;
-    color: #064e3b;
-    margin-bottom: 0.25rem;
-}
-
-.subtitle {
-    text-align: center;
-    color: #065f46;
-    font-size: 1.05rem;
-    margin-bottom: 2rem;
-}
-
-/* BUTTON */
-.stButton>button {
-    width: 100%;
-    background: linear-gradient(135deg, #065f46 0%, #16a34a 100%);
-    color: white;
-    border: none;
-    padding: 0.85rem;
-    border-radius: 14px;
-    font-weight: 700;
-    transition: all 0.3s ease;
-}
-
-.stButton>button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 12px 25px rgba(6, 95, 70, 0.4);
-}
-
-/* INPUTS */
-input, textarea {
-    border-radius: 12px !important;
-}
-
-/* CONTENT CARD */
-.content-card {
-    background: #ffffff;
-    padding: 2rem;
-    border-radius: 18px;
-    border: none;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.12);
-    font-family: 'Georgia', serif;
-    line-height: 1.8;
-}
-
+    .stApp {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .main-header {
+        text-align: center;
+        color: white;
+        padding: 2rem 0;
+    }
+    .login-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    }
+    .feature-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 10px;
+        text-align: center;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    .content-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        margin: 1rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -185,14 +137,14 @@ input, textarea {
 # CENTER LOGO (RENDER AFTER CSS)
 # --------------------------------------------------
 def render_logo_center():
-    st.markdown('<div class="logo-wrapper">', unsafe_allow_html=True)
+    st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         try:
             st.image("assets/logo.png", width=170)
         except:
             st.markdown("### 📰 Magazine Automation")
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div style="margin-bottom: 20px;"></div>', unsafe_allow_html=True)
 
 # 🔥 Render logo AFTER CSS
 render_logo_center()
@@ -248,27 +200,24 @@ def verify_login(username, password):
 
 def login_page():
     # Hero section
-    st.markdown('<div style="text-align: center; padding: 2rem 0;">', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">', unsafe_allow_html=True)
     st.markdown("# 📰")
-    st.markdown('<h1 class="big-title">Sports Magazine Automation</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="subtitle">AI-Powered Match Report Generation</p>', unsafe_allow_html=True)
+    st.markdown('<h1 style="margin: 0; font-size: 3rem;">Sports Magazine Automation</h1>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size: 1.2rem; margin-top: 0.5rem;">AI-Powered Match Report Generation</p>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Login card
     col1, col2, col3 = st.columns([1, 2, 1])
-    
     with col2:
         st.markdown('<div class="login-card">', unsafe_allow_html=True)
-        
         st.markdown("### 🔐 Welcome Back")
         st.markdown("Sign in to generate professional match reports")
-        
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("&nbsp;", unsafe_allow_html=True)
         
         username = st.text_input("👤 Username", placeholder="Enter your username")
         password = st.text_input("🔒 Password", type="password", placeholder="Enter your password")
         
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("&nbsp;", unsafe_allow_html=True)
         
         if st.button("🚀 Sign In"):
             if username and password:
@@ -284,7 +233,7 @@ def login_page():
             else:
                 st.warning("⚠️ Please enter both username and password")
         
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("&nbsp;", unsafe_allow_html=True)
         
         with st.expander("ℹ️ Default Credentials"):
             st.code("Username: admin\nPassword: admin123")
@@ -292,36 +241,29 @@ def login_page():
         st.markdown('</div>', unsafe_allow_html=True)
     
     # Features section
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    
+    st.markdown("&nbsp;", unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.markdown("""
-        <div style="background: rgba(255,255,255,0.9); padding: 2rem; border-radius: 16px; text-align: center;">
-            <div style="font-size: 3rem;">⚡</div>
-            <div style="font-weight: 700; font-size: 1.3rem; margin-top: 0.5rem;">Fast</div>
-            <div style="font-size: 1rem; margin-top: 0.5rem; color: #666;">Generate reports in seconds</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("""<div class="feature-card">
+            <h2>⚡</h2>
+            <h4>Fast</h4>
+            <p>Generate reports in seconds</p>
+        </div>""", unsafe_allow_html=True)
     
     with col2:
-        st.markdown("""
-        <div style="background: rgba(255,255,255,0.9); padding: 2rem; border-radius: 16px; text-align: center;">
-            <div style="font-size: 3rem;">🎯</div>
-            <div style="font-weight: 700; font-size: 1.3rem; margin-top: 0.5rem;">Accurate</div>
-            <div style="font-size: 1rem; margin-top: 0.5rem; color: #666;">Powered by AI technology</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("""<div class="feature-card">
+            <h2>🎯</h2>
+            <h4>Accurate</h4>
+            <p>Powered by AI technology</p>
+        </div>""", unsafe_allow_html=True)
     
     with col3:
-        st.markdown("""
-        <div style="background: rgba(255,255,255,0.9); padding: 2rem; border-radius: 16px; text-align: center;">
-            <div style="font-size: 3rem;">✍️</div>
-            <div style="font-weight: 700; font-size: 1.3rem; margin-top: 0.5rem;">Professional</div>
-            <div style="font-size: 1rem; margin-top: 0.5rem; color: #666;">Magazine-quality content</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("""<div class="feature-card">
+            <h2>✍️</h2>
+            <h4>Professional</h4>
+            <p>Magazine-quality content</p>
+        </div>""", unsafe_allow_html=True)
 
 def logout():
     st.session_state.logged_in = False
@@ -334,7 +276,6 @@ def logout():
 # PlayHQ GraphQL config
 # --------------------------------------------------
 PLAYHQ_GRAPHQL_URL = "https://api.playhq.com/graphql"
-
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "Content-Type": "application/json",
@@ -348,60 +289,139 @@ query gameView($gameId: ID!) {
   discoverGame(gameID: $gameId) {
     id
     date
-    home { ... on DiscoverTeam { name } }
-    away { ... on DiscoverTeam { name } }
-
-    allocation { court { venue { name } } }
-
-    round {
-      grade {
-        season {
-          competition { name }
+    home {
+      ... on DiscoverTeam {
+        name
+      }
+    }
+    away {
+      ... on DiscoverTeam {
+        name
+      }
+    }
+    allocation {
+      court {
+        venue {
+          name
         }
       }
     }
-
-    result {
-      home { score }
-      away { score }
+    round {
+      grade {
+        season {
+          competition {
+            name
+          }
+        }
+      }
     }
-
+    result {
+      home {
+        score
+      }
+      away {
+        score
+      }
+    }
     statistics {
       home {
         players {
           playerNumber
           player {
-            ... on DiscoverParticipant { profile { firstName lastName } }
-            ... on DiscoverParticipantFillInPlayer { profile { firstName lastName } }
-            ... on DiscoverGamePermitFillInPlayer { profile { firstName lastName } }
+            ... on DiscoverParticipant {
+              profile {
+                firstName
+                lastName
+              }
+            }
+            ... on DiscoverParticipantFillInPlayer {
+              profile {
+                firstName
+                lastName
+              }
+            }
+            ... on DiscoverGamePermitFillInPlayer {
+              profile {
+                firstName
+                lastName
+              }
+            }
           }
           statistics {
-            type { value }
+            type {
+              value
+            }
             count
           }
         }
         periods {
-          period { value }
-          statistics { type { value } count }
+          period {
+            value
+          }
+          statistics {
+            type {
+              value
+            }
+            count
+          }
+        }
+        bestPlayers {
+          ranking
+          participant {
+            ... on DiscoverAnonymousParticipant {
+              name
+            }
+          }
         }
       }
-
       away {
         players {
           playerNumber
           player {
-            ... on DiscoverParticipant { profile { firstName lastName } }
-            ... on DiscoverParticipantFillInPlayer { profile { firstName lastName } }
-            ... on DiscoverGamePermitFillInPlayer { profile { firstName lastName } }
+            ... on DiscoverParticipant {
+              profile {
+                firstName
+                lastName
+              }
+            }
+            ... on DiscoverParticipantFillInPlayer {
+              profile {
+                firstName
+                lastName
+              }
+            }
+            ... on DiscoverGamePermitFillInPlayer {
+              profile {
+                firstName
+                lastName
+              }
+            }
           }
           statistics {
-            type { value }
+            type {
+              value
+            }
             count
           }
         }
         periods {
-          period { value }
-          statistics { type { value } count }
+          period {
+            value
+          }
+          statistics {
+            type {
+              value
+            }
+            count
+          }
+        }
+        bestPlayers {
+          ranking
+          participant {
+            ... on DiscoverAnonymousParticipant {
+              name
+            }
+          }
         }
       }
     }
@@ -416,24 +436,44 @@ def extract_match_id(url: str) -> str:
     return url.rstrip("/").split("/")[-1]
 
 def extract_period_scores(periods):
+    """Extract cumulative scores at end of each quarter in Goals.Behinds (Total) format"""
     quarter_map = {
         "FIRST_QTR": "Q1",
         "SECOND_QTR": "Q2",
         "THIRD_QTR": "Q3",
         "FOURTH_QTR": "Q4",
     }
-
-    scores = {"Q1": 0, "Q2": 0, "Q3": 0, "Q4": 0}
-
+    
+    # Per-quarter values from API
+    quarter_goals = {"Q1": 0, "Q2": 0, "Q3": 0, "Q4": 0}
+    quarter_behinds = {"Q1": 0, "Q2": 0, "Q3": 0, "Q4": 0}
+    quarter_scores = {"Q1": 0, "Q2": 0, "Q3": 0, "Q4": 0}
+    
     for p in periods:
         q = quarter_map.get(p["period"]["value"])
         if not q:
             continue
         for s in p["statistics"]:
             if s["type"]["value"] == "TOTAL_SCORE":
-                scores[q] = s["count"]
-
-    return scores
+                quarter_scores[q] = s["count"]
+            elif s["type"]["value"] == "6_POINT_SCORE":
+                quarter_goals[q] = s["count"]
+            elif s["type"]["value"] == "1_POINT_SCORE":
+                quarter_behinds[q] = s["count"]
+    
+    # Calculate cumulative values (PlayHQ style)
+    formatted = {}
+    cumulative_goals = 0
+    cumulative_behinds = 0
+    cumulative_score = 0
+    
+    for q in ["Q1", "Q2", "Q3", "Q4"]:
+        cumulative_goals += quarter_goals[q]
+        cumulative_behinds += quarter_behinds[q]
+        cumulative_score += quarter_scores[q]
+        formatted[q] = f"{cumulative_goals}.{cumulative_behinds} ({cumulative_score})"
+    
+    return formatted
 
 def extract_lineup(players):
     lineup = []
@@ -446,23 +486,62 @@ def extract_lineup(players):
     return lineup
 
 def extract_goal_scorers(players):
+    """Extract goal scorers and sort by goals in descending order"""
     scorers = []
     for p in players:
         profile = p["player"].get("profile")
         if not profile:
             continue
-
         goals = 0
         for s in p.get("statistics", []):
             if s["type"]["value"] == "6_POINT_SCORE":
                 goals = s["count"]
                 break
-
         if goals > 0:
             name = f"{profile['firstName']} {profile['lastName']}"
-            scorers.append(f"{name} ({goals})")
+            scorers.append({"name": name, "goals": goals})
+    
+    # Sort by goals in descending order (highest first)
+    scorers.sort(key=lambda x: x["goals"], reverse=True)
+    
+    # Format as "Name (goals)"
+    return [f"{s['name']} ({s['goals']})" for s in scorers]
 
-    return scorers
+def extract_best_players(best_players_data):
+    """Extract best players from the bestPlayers field - OFFICIAL DATA with debug logging"""
+    print(f"🔍 DEBUG - Best players raw data: {best_players_data}")
+    
+    if not best_players_data:
+        print("⚠️ No best players data provided")
+        return []
+    
+    best = []
+    try:
+        for idx, bp in enumerate(sorted(best_players_data, key=lambda x: x.get("ranking", 999))):
+            print(f"🔍 DEBUG - Processing best player #{idx + 1}: {bp}")
+            participant = bp.get("participant")
+            
+            if not participant or (isinstance(participant, dict) and not participant):
+                print(f"⚠️ Empty participant data for entry #{idx + 1}")
+                continue
+            
+            # Try to get name
+            name = None
+            if isinstance(participant, dict):
+                name = participant.get("name")
+                print(f"🔍 DEBUG - Found name in participant dict: {name}")
+            elif isinstance(participant, str):
+                name = participant
+                print(f"🔍 DEBUG - Participant is string: {name}")
+            
+            if name:
+                best.append(name)
+    except (KeyError, TypeError, AttributeError) as e:
+        print(f"❌ Error extracting best players: {e}")
+        return []
+    
+    print(f"✅ Final best players list: {best}")
+    return best
 
 def save_match_to_db(match):
     db = get_db()
@@ -483,7 +562,8 @@ def save_match_to_db(match):
                 margin=abs(match["final_score"]["home"] - match["final_score"]["away"]),
                 quarter_scores=json.dumps(match["period_scores"]),
                 lineups=json.dumps(match["lineups"]),
-                goal_scorers=json.dumps(match["goal_scorers"])
+                goal_scorers=json.dumps(match["goal_scorers"]),
+                best_players=json.dumps(match["best_players"])
             )
             db.add(new_match)
             db.commit()
@@ -499,19 +579,34 @@ def fetch_match_from_playhq(match_id: str) -> dict:
         "variables": {"gameId": match_id},
         "query": GRAPHQL_QUERY,
     }
-
     r = requests.post(
         PLAYHQ_GRAPHQL_URL,
         headers=HEADERS,
         json=payload,
         timeout=30
     )
-
     response = r.json()
     if "errors" in response:
         raise RuntimeError(response["errors"])
 
     game = response["data"]["discoverGame"]
+
+    # DEBUG: Print raw best players data
+    print("🔍 DEBUG - Raw HOME bestPlayers from API:", game["statistics"]["home"].get("bestPlayers"))
+    print("🔍 DEBUG - Raw AWAY bestPlayers from API:", game["statistics"]["away"].get("bestPlayers"))
+
+    # Extract best players from API
+    home_best = extract_best_players(game["statistics"]["home"].get("bestPlayers", []))
+    away_best = extract_best_players(game["statistics"]["away"].get("bestPlayers", []))
+
+    # If no best players data available, set as None (will be handled in display)
+    if not home_best:
+        print("⚠️ No HOME best players from API - marking as unavailable")
+        home_best = None
+    
+    if not away_best:
+        print("⚠️ No AWAY best players from API - marking as unavailable")
+        away_best = None
 
     match = {
         "match_id": game["id"],
@@ -535,58 +630,134 @@ def fetch_match_from_playhq(match_id: str) -> dict:
         "goal_scorers": {
             "home": extract_goal_scorers(game["statistics"]["home"]["players"]),
             "away": extract_goal_scorers(game["statistics"]["away"]["players"]),
+        },
+        "best_players": {
+            "home": home_best,
+            "away": away_best,
         }
     }
 
+    print(f"🔍 DEBUG - Final match best_players: HOME={match['best_players']['home']}, AWAY={match['best_players']['away']}")
     save_match_to_db(match)
     return match
 
 def build_match_knowledge(match: dict) -> str:
+    """Build enhanced match knowledge with official best players and formatted scores"""
     home = match["home_team"]
     away = match["away_team"]
-
     fs_home = match["final_score"]["home"]
     fs_away = match["final_score"]["away"]
     margin = abs(fs_home - fs_away)
-
     hq = match["period_scores"]["home"]
     aq = match["period_scores"]["away"]
 
     home_scorers_text = ", ".join(match["goal_scorers"]["home"]) if match["goal_scorers"]["home"] else "None"
     away_scorers_text = ", ".join(match["goal_scorers"]["away"]) if match["goal_scorers"]["away"] else "None"
+    
+    # Handle None for best players
+    if match["best_players"]["home"] is None:
+        home_best_text = "Not available"
+    else:
+        home_best_text = ", ".join(match["best_players"]["home"]) if match["best_players"]["home"] else "None"
+    
+    if match["best_players"]["away"] is None:
+        away_best_text = "Not available"
+    else:
+        away_best_text = ", ".join(match["best_players"]["away"]) if match["best_players"]["away"] else "None"
 
     return f"""
 {home} played {away} in an Adelaide Footy League match.
 
 The match took place on {match['date']} at {match['venue']} as part of the {match['competition']} season.
 
-Quarter-by-quarter scores:
-Q1: {home} {hq['Q1']} – {away} {aq['Q1']}
-Q2: {home} {hq['Q2']} – {away} {aq['Q2']}
-Q3: {home} {hq['Q3']} – {away} {aq['Q3']}
-Q4: {home} {hq['Q4']} – {away} {aq['Q4']}
+PERIOD SCORES (Cumulative Goals.Behinds):
+End of Period | Q1        | Q2        | Q3        | Q4
+{home}        | {hq['Q1']} | {hq['Q2']} | {hq['Q3']} | {hq['Q4']}
+{away}        | {aq['Q1']} | {aq['Q2']} | {aq['Q3']} | {aq['Q4']}
 
-Final score:
-{home} {fs_home} defeated {away} {fs_away}.
-
+Final score: {home} {fs_home} defeated {away} {fs_away}.
 Margin: {margin} points.
 
+Match Competitiveness Analysis:
+- Final margin: {margin} points
+- {"This was a close contest" if margin <= 20 else "This was a comfortable victory" if margin <= 40 else "This was a dominant performance"}
+
 Team lineups:
-
 {home}:
-- {"\n- ".join(match["lineups"]["home"])}
+- {chr(10).join(match["lineups"]["home"])}
 
 {away}:
-- {"\n- ".join(match["lineups"]["away"])}
+- {chr(10).join(match["lineups"]["away"])}
 
-GOAL SCORERS:
+GOAL SCORERS (OFFICIAL):
+{home}: {home_scorers_text}
+{away}: {away_scorers_text}
 
-{home}:
-{home_scorers_text}
-
-{away}:
-{away_scorers_text}
+BEST PLAYERS (OFFICIAL):
+{home}: {home_best_text}
+{away}: {away_best_text}
 """.strip()
+
+def calculate_openai_cost(prompt_tokens, completion_tokens, model="gpt-4o-mini"):
+    """
+    Calculate the cost of OpenAI API usage based on token counts.
+    
+    Pricing as of 2024 (update these if pricing changes):
+    GPT-4o-mini:
+    - Input: $0.150 per 1M tokens
+    - Output: $0.600 per 1M tokens
+    
+    GPT-4o:
+    - Input: $2.50 per 1M tokens  
+    - Output: $10.00 per 1M tokens
+    """
+    
+    pricing = {
+        "gpt-4o-mini": {
+            "input": 0.150 / 1_000_000,   # $0.150 per 1M tokens
+            "output": 0.600 / 1_000_000,  # $0.600 per 1M tokens
+        },
+        "gpt-4o": {
+            "input": 2.50 / 1_000_000,    # $2.50 per 1M tokens
+            "output": 10.00 / 1_000_000,  # $10.00 per 1M tokens
+        },
+        "gpt-4-turbo": {
+            "input": 10.00 / 1_000_000,   # $10.00 per 1M tokens
+            "output": 30.00 / 1_000_000,  # $30.00 per 1M tokens
+        }
+    }
+    
+    if model not in pricing:
+        model = "gpt-4o-mini"  # Default fallback
+    
+    input_cost = prompt_tokens * pricing[model]["input"]
+    output_cost = completion_tokens * pricing[model]["output"]
+    total_cost = input_cost + output_cost
+    
+    return total_cost
+
+def save_generation_cost(user_id, match_id, content_type, prompt_tokens, completion_tokens, total_tokens, cost_usd, model):
+    """Save generation cost to database"""
+    db = get_db()
+    try:
+        new_cost = GenerationCost(
+            user_id=user_id,
+            match_id=match_id,
+            content_type=content_type,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            cost_usd=cost_usd,
+            model=model,
+            generated_at=datetime.utcnow().isoformat()
+        )
+        db.add(new_cost)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"Error saving cost: {e}")
+    finally:
+        db.close()
 
 # --------------------------------------------------
 # Main App
@@ -597,7 +768,6 @@ def main_app():
         st.markdown("### 👤 User Profile")
         st.markdown(f"**Name:** {st.session_state.user['username']}")
         st.markdown(f"**Role:** {st.session_state.user['role'].upper()}")
-        
         st.divider()
         
         # Quick stats
@@ -622,18 +792,17 @@ def main_app():
         st.divider()
         st.markdown("### 📚 Quick Guide")
         st.markdown("""
-        1. **Paste** PlayHQ match URLs
-        2. **Build** knowledge base
-        3. **Generate** content
-        4. **Copy** and use!
+1. **Paste** PlayHQ match URLs
+2. **Build** knowledge base
+3. **Generate** content
+4. **Copy** and use!
         """)
-    
+
     # Main header
     st.markdown("# 📰 Magazine Automation")
     st.markdown(f"### Welcome back, **{st.session_state.user['username']}**! 👋")
-    
     st.divider()
-    
+
     # Step 1: Input URLs
     st.markdown("## 🔗 Step 1: Add Match URLs")
     st.markdown("Paste PlayHQ match URLs below (one per line)")
@@ -644,11 +813,11 @@ def main_app():
         height=150,
         label_visibility="collapsed"
     )
-
+    
     col1, col2, col3 = st.columns([2, 1, 2])
     with col2:
         build_button = st.button("📥 Build Knowledge Base", use_container_width=True, type="primary")
-
+    
     if build_button:
         if not urls.strip():
             st.error("⚠️ Please enter at least one URL")
@@ -678,24 +847,22 @@ def main_app():
                             with col2:
                                 st.markdown(f"**Score:** {match['final_score']['home']} - {match['final_score']['away']}")
                                 st.markdown(f"**Margin:** {abs(match['final_score']['home'] - match['final_score']['away'])} pts")
-                        
+                    
                     except Exception as e:
                         st.error(f"❌ Error fetching {url}: {str(e)}")
                     
                     progress_bar.progress((idx + 1) / len(url_list))
-
+                
                 if docs:
-                    splitter = RecursiveCharacterTextSplitter(chunk_size=700, chunk_overlap=150)
+                    splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=150)
                     chunks = [
                         Document(page_content=c, metadata=d.metadata)
                         for d in docs
                         for c in splitter.split_text(d.page_content)
                     ]
-
                     st.session_state.vectordb = InMemoryVectorStore.from_documents(
                         chunks, OpenAIEmbeddings()
                     )
-
                     st.success(f"🎉 Knowledge base created! {len(docs)} matches, {len(chunks)} chunks")
                     st.balloons()
 
@@ -705,7 +872,6 @@ def main_app():
         st.markdown("## ✍️ Step 2: Generate Content")
         
         col1, col2 = st.columns([2, 1])
-        
         with col1:
             content_type = st.selectbox(
                 "📝 Content Type",
@@ -714,79 +880,276 @@ def main_app():
             )
         
         with col2:
-            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("&nbsp;", unsafe_allow_html=True)
             generate_button = st.button("🧠 Generate Content", use_container_width=True, type="primary")
-
+        
         if generate_button:
+            model_name = "gpt-4o-mini"
             llm = ChatOpenAI(
-                model="gpt-4o-mini",
+                model=model_name,
                 temperature=0.25,
                 max_tokens=1200
             )
-
             retriever = st.session_state.vectordb.as_retriever(k=6)
-            
-            prompt_text = """
+
+            # THREE DIFFERENT PROMPTS FOR DIFFERENT CONTENT TYPES
+            magazine_prompt = """
 You are a professional Australian football journalist writing for a print magazine.
 
-You MUST follow this structure exactly.
+CRITICAL RULES - READ CAREFULLY:
+1. Use ONLY the exact best players listed in the "BEST PLAYERS (OFFICIAL)" section
+2. If best players show "Not available", write exactly: "Best players not available"
+3. Use ONLY the exact goal scorers listed in the "GOAL SCORERS (OFFICIAL)" section
+4. Do NOT invent or guess any player names
+5. Use the Period Scores table format exactly as shown in the context
 
-STRUCTURE:
+LADDER POSITION RULES (STRICT):
+- Ladder positions may be used ONLY if ladder data exists in database AND its date EXACTLY matches the match date being reported.
+- If ladder data is from any earlier date, previous round, or is not explicitly tied to the same match date, DO NOT mention the ladder at all.
+- When used, ladder positions must be stated factually and numerically only (e.g. "sitting second on the ladder").
+- Do NOT describe form, momentum, struggles, dominance, or season trajectory unless explicitly stated in the provided data.
+- Do NOT use subjective ladder language (e.g. "upper echelon", "struggling", "in form", "charging").
+- If both teams have valid ladder positions for the same date, mention both.
+- If only one team has valid ladder data for that date, mention ONLY that team.
+- If ladder data is missing, outdated, or unclear, omit ladder references entirely.
 
-1. Opening Paragraph
-- Mention venue and match context
-- Describe relative team strength using neutral editorial tone
-- Do NOT invent ladder positions unless provided
+OPENING PARAGRAPH - MUST BE CONTEXTUAL:
+Look at the "Match Competitiveness Analysis" in the context to determine the tone:
+- If margin ≤ 20 points: Use phrases like "In a closely fought contest", "In a tight encounter", or "In a thrilling clash"
+- If margin 21-40 points: Use phrases like "In a solid performance", "In a commanding display", "In a professional showing", or "In a one sided match"
+- If margin > 40 points: Use phrases like "In a dominant display", "In an emphatic victory", "In a comprehensive performance", or "In a one-sided affair"
+- If margin > 90 points: Use phrases like "In an absolute mauling", "In a complete thrashing"
 
-2. QUARTER BY QUARTER SCORES
-- List Q1, Q2, Q3, Q4
-- Use exact scorelines from context
+IMPORTANT: The opening MUST reflect the actual competitiveness of the match. Do NOT say "close encounter" if the margin was 50+ points!
 
-3. Quarter-by-Quarter Match Narrative
-- One paragraph per quarter (Q1, Q2, Q3, Q4)
-- Mention which team controlled the quarter
-- Quote the exact scoreline after each quarter
-- Mention the margin after each quarter
+STRUCTURE (USE EXACT HEADINGS):
 
-4. Final Summary Paragraph
-- Summarise how the winning team controlled the match
-- Mention the final margin
+1. Opening Paragraph (NO HEADING) - MUST BE 2-3 SENTENCES
+   - First sentence: Start with contextually appropriate language based on margin, mention venue, state the result
+   - Second sentence: Add context about the match (team performances, key factors, turning points)
+   - Optional third sentence: Additional match context or significance
+   - Mention ONLY the venue (e.g., "at [Venue Name]")
+   - Do NOT mention the date
+   - Do NOT mention the competition name (e.g., Adelaide Footy League)
+   - If ladder positions exist in database for same date as match, mention them naturally in the opening sentences
+   
+   Examples:
+   - "In a dominant display at Payneham Oval, Port District defeated Golden Grove by 51 points. The home side controlled the contest from start to finish, with their forwards proving too strong for the opposition defense."
+   
+   - "In a closely fought contest at West Lakes, Glenelg sitting third on the ladder edged out Sturt by 12 points. The match lived up to expectations with both teams trading blows throughout the four quarters."
 
-5. BEST PLAYERS
-- List best players for each team separately
-- Use player names from context only
+2. Final Scores (EXACT HEADING)
+   Use this exact table format:
+```
+   [Home Team] | [Q1 score] | [Q2 score] | [Q3 score] | [Q4 score]
+   [Away Team] | [Q1 score] | [Q2 score] | [Q3 score] | [Q4 score]
+```
+   Use the exact cumulative scores from context (e.g., "5.3 (33)")
 
-6. GOAL SCORERS SECTION (MANDATORY):
-- List goal scorers for each team separately
-- Use names exactly as provided in context
-- Include goal counts as shown in context
-- Do NOT invent scorers
+3. MATCH SUMMARY (EXACT HEADING)
+   Write 4 paragraphs, one for each quarter:
+   - 1: Describe the first quarter action and end with the Q1 scoreline and margin
+   - 2: Describe the second quarter action and end with the Q2 scoreline and margin
+   - 3: Describe the third quarter action and end with the Q3 scoreline and margin
+   - 4: Describe the fourth quarter action and end with the Q4 scoreline and margin
 
-7. PLAYED AT
-- Write the venue name
+4. FINAL WRAP-UP (EXACT HEADING)
+   - Summarize how the winning team controlled the match
+   - Mention key factors in the victory
+   - State the final margin
+
+5. BEST PLAYERS (EXACT HEADING)
+   If best players are listed, use them:
+   [Home Team]: [List official best players separated by commas]
+   [Away Team]: [List official best players separated by commas]
+   
+   If best players show "Not available", write:
+   [Home Team]: Best players not available
+   [Away Team]: Best players not available
+
+6. GOAL SCORERS (EXACT HEADING)
+   Use ONLY names from "GOAL SCORERS (OFFICIAL)":
+   [Home Team]: [List official goal scorers with counts]
+   [Away Team]: [List official goal scorers with counts]
+
+7. PLAYED AT (EXACT HEADING)
+   [Venue name]
 
 STRICT RULES:
-- Use ONLY the provided context
-- Do NOT invent players, scores, or facts
-- Editorial language is allowed, facts are not
-- Formatting must match magazine style
+- Opening paragraph MUST be 2-3 sentences (NOT just one sentence)
+- Opening paragraph MUST match the actual margin (close/comfortable/dominant)
+- Opening paragraph mentions ONLY venue - NO date, NO competition name
+- Use ONLY official player names - NO inventions
+- Use exact headings: "Final Scores", "MATCH SUMMARY", "FINAL WRAP-UP", "BEST PLAYERS", "GOAL SCORERS", "PLAYED AT"
+- Editorial language is allowed, but all facts must come from context
 
 LENGTH REQUIREMENT:
-- Total article length: 750–900 words
+- Total: 750–900 words
 - Do not exceed 950 words
 - Do not go below 700 words
 
-Context: {context}
+Context:
+{context}
 
 Write the magazine match report now.
 """
 
+            web_article_prompt = """
+You are a digital sports journalist writing an engaging web article for an online audience.
+
+CRITICAL RULES:
+1. Use ONLY the exact best players listed in the "BEST PLAYERS (OFFICIAL)" section
+2. If best players show "Not available", write exactly: "Best players not available"
+3. Use ONLY the exact goal scorers listed in the "GOAL SCORERS (OFFICIAL)" section
+4. Do NOT invent or guess any player names
+
+WEB ARTICLE STRUCTURE:
+
+1. HEADLINE (Create a catchy, SEO-friendly headline)
+   - Use action words and the winning team's name
+   - Example: "[Team] Storm Home in Thrilling [Margin]-Point Victory"
+
+2. LEAD PARAGRAPH (1-2 sentences)
+   - Summarize the match result immediately
+   - Include: Winner, loser, final score, venue, and what it means
+
+3. KEY MOMENTS (Section heading)
+   - Write 3-4 short paragraphs about crucial moments
+   - Use subheadings for each moment (e.g., "First Quarter Blitz", "Second Half Comeback")
+   - Make it scannable with bold text for key facts
+   - Include specific scores and turning points
+
+4. PLAYER PERFORMANCES (Section heading)
+   - Highlight 2-3 standout players from OFFICIAL best players list
+   - Write 1-2 sentences about each player's impact
+   - Use quotes-style language: "X was instrumental" or "Y dominated"
+   - If best players show "Not available", write: "Best players not available"
+
+5. THE STATS (Section heading)
+   Present key statistics in bullet points:
+   - Final Score: [Home] X defeated [Away] Y
+   - Margin: Z points
+   - Top Goal Scorers: [Use OFFICIAL list]
+   - Best Players: [Use OFFICIAL list OR "Best players not available"]
+   - Venue: [Venue name]
+
+6. WHAT IT MEANS (Section heading)
+   - 1-2 paragraphs on implications
+   - Keep it general - don't invent ladder positions
+   - Focus on momentum, form, team confidence
+
+WEB STYLE REQUIREMENTS:
+- Short paragraphs (2-3 sentences max)
+- Use subheadings frequently
+- Bold important facts
+- Active voice and present tense for immediacy
+- Engaging, conversational tone
+- SEO keywords: team names, venue, competition
+
+LENGTH: 500-650 words
+
+Context:
+{context}
+
+Write the web article now.
+"""
+
+            social_media_prompt = """
+You are a social media content creator writing an engaging long-form post about an AFL match.
+
+CRITICAL RULES:
+1. Use ONLY the exact best players listed in the "BEST PLAYERS (OFFICIAL)" section
+2. If best players show "Not available", write exactly: "Best players not available"
+3. Use ONLY the exact goal scorers listed in the "GOAL SCORERS (OFFICIAL)" section
+4. Do NOT invent or guess any player names
+
+SOCIAL MEDIA LONG-FORM POST STRUCTURE:
+
+1. ATTENTION-GRABBING OPENING (2-3 sentences)
+   - Start with emoji and excitement
+   - Announce the result with energy
+   - Use conversational, enthusiastic tone
+   
+   Example: "🔥 WHAT. A. GAME! [Team] have done it again, defeating [Team] by [margin] points in an absolute thriller at [venue]!"
+
+2. THE STORY (3-4 short paragraphs)
+   - Tell the match narrative quarter by quarter
+   - Use emojis strategically (⚡ 🎯 💪 🏆)
+   - Keep sentences short and punchy
+   - Build excitement and drama
+   - Mention key moments and momentum shifts
+
+3. THE HEROES (1-2 paragraphs)
+   - Highlight 2-3 best players from OFFICIAL list
+   - Use celebratory language
+   - Give each player a 1-sentence shoutout
+   - If best players show "Not available", write: "Best players not available"
+   
+   Example: "Standing ovation for [Player] 👏 who was absolutely unstoppable with [X] goals!"
+
+4. BY THE NUMBERS (Formatted list)
+   Present as easy-to-read stats:
+   
+   📊 THE NUMBERS:
+   ⚽ Final Score: [Home] X-Y [Away]
+   📍 Venue: [Venue]
+   ⭐ Margin: Z points
+   🎯 Top Goal Kickers:
+   • [Home team goals - use OFFICIAL list]
+   • [Away team goals - use OFFICIAL list]
+   💎 Best Players:
+   • [Home team - use OFFICIAL list OR "Best players not available"]
+   • [Away team - use OFFICIAL list OR "Best players not available"]
+
+5. CLOSING HOOK (1-2 sentences)
+   - End with forward-looking statement
+   - Engage audience
+   - Use relevant hashtags
+   
+   Example: "This team is on fire! 🔥 Can they keep this momentum going? Drop your thoughts below! 👇"
+
+SOCIAL MEDIA STYLE REQUIREMENTS:
+- Conversational, enthusiastic tone
+- Use emojis (but don't overdo it - max 8-10 for entire post)
+- Short paragraphs (1-3 sentences)
+- Active voice, present tense
+- Create FOMO and excitement
+- Easy to read on mobile
+- Include relevant hashtags at the end (3-5 hashtags)
+
+EMOJI USAGE GUIDE:
+- 🔥 (excitement, dominance)
+- ⚡ (speed, momentum)
+- 💪 (strength, performance)
+- 🎯 (accuracy, goals)
+- 🏆 (victory, excellence)
+- 👏 (applause, recognition)
+- 📊 (statistics)
+- ⚽ (goals)
+- 💎 (star players)
+
+LENGTH: 350-500 words
+
+Context:
+{context}
+
+Write the social media long-form post now. Remember to include hashtags at the end!
+"""
+
+            # Select the appropriate prompt based on content type
+            if content_type == "Magazine match report":
+                prompt_text = magazine_prompt
+            elif content_type == "Web article":
+                prompt_text = web_article_prompt
+            else:  # Social media long-form post
+                prompt_text = social_media_prompt
+
             prompt_template = ChatPromptTemplate.from_template(prompt_text)
-            
+
             def format_docs(docs):
                 return "\n\n".join([d.page_content for d in docs])
-            
-            # Modern chain using LCEL
+
+            # Modern LCEL chain
             chain = (
                 {"context": retriever | format_docs}
                 | prompt_template
@@ -795,31 +1158,71 @@ Write the magazine match report now.
             )
 
             with st.spinner("✨ Generating professional content..."):
-                result = chain.invoke("Generate a match report")
-                
-                st.markdown("## 📄 Generated Content")
-                
-                # Display in a nice card
-                st.markdown('<div class="content-card">', unsafe_allow_html=True)
-                st.markdown(result)
-                st.markdown('</div>', unsafe_allow_html=True)
-                
-                # Stats
-                word_count = len(result.split())
-                char_count = len(result)
-                
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("📊 Word Count", word_count)
-                with col2:
-                    st.metric("📝 Characters", char_count)
-                with col3:
-                    st.metric("📄 Type", content_type.split()[0])
-                
-                # Copy button
-                st.text_area("📋 Copy Text", result, height=300)
-                
-                st.success("✅ Content generated successfully!")
+                # Use the LLM with token tracking
+                with get_openai_callback() as cb:
+                    result = chain.invoke("Generate a match report")
+                    
+                    # Extract token usage
+                    prompt_tokens = cb.prompt_tokens
+                    completion_tokens = cb.completion_tokens
+                    total_tokens = cb.total_tokens
+                    
+                    # Calculate cost
+                    cost_usd = calculate_openai_cost(prompt_tokens, completion_tokens, model_name)
+                    
+                    # Get match_id from the first document in vectordb (if available)
+                    match_id = "unknown"
+                    try:
+                        # Retrieve one document to get match_id from metadata
+                        docs = retriever.get_relevant_documents("match")
+                        if docs:
+                            match_id = docs[0].metadata.get("match_id", "unknown")
+                    except:
+                        pass
+                    
+                    # Save cost to database
+                    save_generation_cost(
+                        user_id=st.session_state.user['id'],
+                        match_id=match_id,
+                        content_type=content_type,
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                        total_tokens=total_tokens,
+                        cost_usd=cost_usd,
+                        model=model_name
+                    )
+                    
+                    # Debug logging (optional - you can remove this in production)
+                    print(f"💰 Cost Tracking:")
+                    print(f"   Model: {model_name}")
+                    print(f"   Prompt Tokens: {prompt_tokens}")
+                    print(f"   Completion Tokens: {completion_tokens}")
+                    print(f"   Total Tokens: {total_tokens}")
+                    print(f"   Cost: ${cost_usd:.6f} USD")
+
+            st.markdown("## 📄 Generated Content")
+            
+            # Display in a nice card
+            st.markdown('<div class="content-card">', unsafe_allow_html=True)
+            st.markdown(result)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            # Stats
+            word_count = len(result.split())
+            char_count = len(result)
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("📊 Word Count", word_count)
+            with col2:
+                st.metric("📝 Characters", char_count)
+            with col3:
+                st.metric("📄 Type", content_type.split()[0])
+
+            # Copy button
+            st.text_area("📋 Copy Text", result, height=300)
+            
+            st.success("✅ Content generated successfully!")
 
 # --------------------------------------------------
 # Run App
