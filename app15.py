@@ -5,7 +5,7 @@ import hashlib
 import os
 from datetime import datetime
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String, Text, Float
+from sqlalchemy import create_engine, Column, Integer, String, Text, Float, inspect
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -24,14 +24,11 @@ load_dotenv()
 # --------------------------------------------------
 # Database Setup with PostgreSQL
 # --------------------------------------------------
-# Get database URL from environment variable (Render will provide this)
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///magazine.db')
 
-# Fix for Render PostgreSQL URL (they use postgres:// but SQLAlchemy needs postgresql://)
 if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
-# Create engine
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 Base = declarative_base()
 
@@ -76,10 +73,29 @@ class GenerationCost(Base):
     model = Column(String(100))
     generated_at = Column(String(255))
 
-# Create tables
-Base.metadata.create_all(engine)
+# Migration function to add missing columns
+def migrate_database():
+    """Add any missing columns to existing tables"""
+    inspector = inspect(engine)
+    
+    # Check if matches table exists
+    if 'matches' in inspector.get_table_names():
+        existing_columns = [col['name'] for col in inspector.get_columns('matches')]
+        
+        # Add best_players column if it doesn't exist
+        if 'best_players' not in existing_columns:
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE matches ADD COLUMN best_players TEXT"))
+                    conn.commit()
+                print("✅ Added best_players column to matches table")
+            except Exception as e:
+                print(f"⚠️ Could not add best_players column: {e}")
 
-# Create session factory
+# Create tables and run migrations
+Base.metadata.create_all(engine)
+migrate_database()
+
 SessionLocal = sessionmaker(bind=engine)
 
 def get_db():
@@ -97,9 +113,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --------------------------------------------------
-# Custom CSS (INJECT FIRST)
-# --------------------------------------------------
 st.markdown("""
 <style>
     .stApp {
@@ -133,9 +146,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --------------------------------------------------
-# CENTER LOGO (RENDER AFTER CSS)
-# --------------------------------------------------
 def render_logo_center():
     st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -146,16 +156,11 @@ def render_logo_center():
             st.markdown("### 📰 Magazine Automation")
     st.markdown('<div style="margin-bottom: 20px;"></div>', unsafe_allow_html=True)
 
-# 🔥 Render logo AFTER CSS
 render_logo_center()
 
-# --------------------------------------------------
-# Create default admin user if not exists
-# --------------------------------------------------
 def create_default_admin():
     db = get_db()
     try:
-        # Check if admin exists
         existing_admin = db.query(User).filter_by(username="admin").first()
         if not existing_admin:
             admin_password = hashlib.sha256("admin123".encode()).hexdigest()
@@ -175,9 +180,6 @@ def create_default_admin():
 
 create_default_admin()
 
-# --------------------------------------------------
-# Authentication Functions
-# --------------------------------------------------
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
@@ -199,14 +201,12 @@ def verify_login(username, password):
         db.close()
 
 def login_page():
-    # Hero section
     st.markdown('<div class="main-header">', unsafe_allow_html=True)
     st.markdown("# 📰")
     st.markdown('<h1 style="margin: 0; font-size: 3rem;">Sports Magazine Automation</h1>', unsafe_allow_html=True)
     st.markdown('<p style="font-size: 1.2rem; margin-top: 0.5rem;">AI-Powered Match Report Generation</p>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Login card
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown('<div class="login-card">', unsafe_allow_html=True)
@@ -240,7 +240,6 @@ def login_page():
         
         st.markdown('</div>', unsafe_allow_html=True)
     
-    # Features section
     st.markdown("&nbsp;", unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
     
@@ -272,9 +271,6 @@ def logout():
         del st.session_state.vectordb
     st.rerun()
 
-# --------------------------------------------------
-# PlayHQ GraphQL config
-# --------------------------------------------------
 PLAYHQ_GRAPHQL_URL = "https://api.playhq.com/graphql"
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
@@ -429,14 +425,10 @@ query gameView($gameId: ID!) {
 }
 """
 
-# --------------------------------------------------
-# Helpers
-# --------------------------------------------------
 def extract_match_id(url: str) -> str:
     return url.rstrip("/").split("/")[-1]
 
 def extract_period_scores(periods):
-    """Extract cumulative scores at end of each quarter in Goals.Behinds (Total) format"""
     quarter_map = {
         "FIRST_QTR": "Q1",
         "SECOND_QTR": "Q2",
@@ -444,7 +436,6 @@ def extract_period_scores(periods):
         "FOURTH_QTR": "Q4",
     }
     
-    # Per-quarter values from API
     quarter_goals = {"Q1": 0, "Q2": 0, "Q3": 0, "Q4": 0}
     quarter_behinds = {"Q1": 0, "Q2": 0, "Q3": 0, "Q4": 0}
     quarter_scores = {"Q1": 0, "Q2": 0, "Q3": 0, "Q4": 0}
@@ -461,7 +452,6 @@ def extract_period_scores(periods):
             elif s["type"]["value"] == "1_POINT_SCORE":
                 quarter_behinds[q] = s["count"]
     
-    # Calculate cumulative values (PlayHQ style)
     formatted = {}
     cumulative_goals = 0
     cumulative_behinds = 0
@@ -486,7 +476,6 @@ def extract_lineup(players):
     return lineup
 
 def extract_goal_scorers(players):
-    """Extract goal scorers and sort by goals in descending order"""
     scorers = []
     for p in players:
         profile = p["player"].get("profile")
@@ -501,52 +490,37 @@ def extract_goal_scorers(players):
             name = f"{profile['firstName']} {profile['lastName']}"
             scorers.append({"name": name, "goals": goals})
     
-    # Sort by goals in descending order (highest first)
     scorers.sort(key=lambda x: x["goals"], reverse=True)
-    
-    # Format as "Name (goals)"
     return [f"{s['name']} ({s['goals']})" for s in scorers]
 
 def extract_best_players(best_players_data):
-    """Extract best players from the bestPlayers field - OFFICIAL DATA with debug logging"""
-    print(f"🔍 DEBUG - Best players raw data: {best_players_data}")
-    
     if not best_players_data:
-        print("⚠️ No best players data provided")
         return []
     
     best = []
     try:
-        for idx, bp in enumerate(sorted(best_players_data, key=lambda x: x.get("ranking", 999))):
-            print(f"🔍 DEBUG - Processing best player #{idx + 1}: {bp}")
+        for bp in sorted(best_players_data, key=lambda x: x.get("ranking", 999)):
             participant = bp.get("participant")
             
             if not participant or (isinstance(participant, dict) and not participant):
-                print(f"⚠️ Empty participant data for entry #{idx + 1}")
                 continue
             
-            # Try to get name
             name = None
             if isinstance(participant, dict):
                 name = participant.get("name")
-                print(f"🔍 DEBUG - Found name in participant dict: {name}")
             elif isinstance(participant, str):
                 name = participant
-                print(f"🔍 DEBUG - Participant is string: {name}")
             
             if name:
                 best.append(name)
-    except (KeyError, TypeError, AttributeError) as e:
-        print(f"❌ Error extracting best players: {e}")
+    except (KeyError, TypeError, AttributeError):
         return []
     
-    print(f"✅ Final best players list: {best}")
     return best
 
 def save_match_to_db(match):
     db = get_db()
     try:
-        # Check if match already exists
         existing_match = db.query(Match).filter_by(match_id=match["match_id"]).first()
         if not existing_match:
             new_match = Match(
@@ -579,33 +553,20 @@ def fetch_match_from_playhq(match_id: str) -> dict:
         "variables": {"gameId": match_id},
         "query": GRAPHQL_QUERY,
     }
-    r = requests.post(
-        PLAYHQ_GRAPHQL_URL,
-        headers=HEADERS,
-        json=payload,
-        timeout=30
-    )
+    r = requests.post(PLAYHQ_GRAPHQL_URL, headers=HEADERS, json=payload, timeout=30)
     response = r.json()
     if "errors" in response:
         raise RuntimeError(response["errors"])
 
     game = response["data"]["discoverGame"]
 
-    # DEBUG: Print raw best players data
-    print("🔍 DEBUG - Raw HOME bestPlayers from API:", game["statistics"]["home"].get("bestPlayers"))
-    print("🔍 DEBUG - Raw AWAY bestPlayers from API:", game["statistics"]["away"].get("bestPlayers"))
-
-    # Extract best players from API
     home_best = extract_best_players(game["statistics"]["home"].get("bestPlayers", []))
     away_best = extract_best_players(game["statistics"]["away"].get("bestPlayers", []))
 
-    # If no best players data available, set as None (will be handled in display)
     if not home_best:
-        print("⚠️ No HOME best players from API - marking as unavailable")
         home_best = None
     
     if not away_best:
-        print("⚠️ No AWAY best players from API - marking as unavailable")
         away_best = None
 
     match = {
@@ -637,12 +598,10 @@ def fetch_match_from_playhq(match_id: str) -> dict:
         }
     }
 
-    print(f"🔍 DEBUG - Final match best_players: HOME={match['best_players']['home']}, AWAY={match['best_players']['away']}")
     save_match_to_db(match)
     return match
 
 def build_match_knowledge(match: dict) -> str:
-    """Build enhanced match knowledge with official best players and formatted scores"""
     home = match["home_team"]
     away = match["away_team"]
     fs_home = match["final_score"]["home"]
@@ -654,7 +613,6 @@ def build_match_knowledge(match: dict) -> str:
     home_scorers_text = ", ".join(match["goal_scorers"]["home"]) if match["goal_scorers"]["home"] else "None"
     away_scorers_text = ", ".join(match["goal_scorers"]["away"]) if match["goal_scorers"]["away"] else "None"
     
-    # Handle None for best players
     if match["best_players"]["home"] is None:
         home_best_text = "Not available"
     else:
@@ -699,36 +657,23 @@ BEST PLAYERS (OFFICIAL):
 """.strip()
 
 def calculate_openai_cost(prompt_tokens, completion_tokens, model="gpt-4o-mini"):
-    """
-    Calculate the cost of OpenAI API usage based on token counts.
-    
-    Pricing as of 2024 (update these if pricing changes):
-    GPT-4o-mini:
-    - Input: $0.150 per 1M tokens
-    - Output: $0.600 per 1M tokens
-    
-    GPT-4o:
-    - Input: $2.50 per 1M tokens  
-    - Output: $10.00 per 1M tokens
-    """
-    
     pricing = {
         "gpt-4o-mini": {
-            "input": 0.150 / 1_000_000,   # $0.150 per 1M tokens
-            "output": 0.600 / 1_000_000,  # $0.600 per 1M tokens
+            "input": 0.150 / 1_000_000,
+            "output": 0.600 / 1_000_000,
         },
         "gpt-4o": {
-            "input": 2.50 / 1_000_000,    # $2.50 per 1M tokens
-            "output": 10.00 / 1_000_000,  # $10.00 per 1M tokens
+            "input": 2.50 / 1_000_000,
+            "output": 10.00 / 1_000_000,
         },
         "gpt-4-turbo": {
-            "input": 10.00 / 1_000_000,   # $10.00 per 1M tokens
-            "output": 30.00 / 1_000_000,  # $30.00 per 1M tokens
+            "input": 10.00 / 1_000_000,
+            "output": 30.00 / 1_000_000,
         }
     }
     
     if model not in pricing:
-        model = "gpt-4o-mini"  # Default fallback
+        model = "gpt-4o-mini"
     
     input_cost = prompt_tokens * pricing[model]["input"]
     output_cost = completion_tokens * pricing[model]["output"]
@@ -737,7 +682,6 @@ def calculate_openai_cost(prompt_tokens, completion_tokens, model="gpt-4o-mini")
     return total_cost
 
 def save_generation_cost(user_id, match_id, content_type, prompt_tokens, completion_tokens, total_tokens, cost_usd, model):
-    """Save generation cost to database"""
     db = get_db()
     try:
         new_cost = GenerationCost(
@@ -759,18 +703,13 @@ def save_generation_cost(user_id, match_id, content_type, prompt_tokens, complet
     finally:
         db.close()
 
-# --------------------------------------------------
-# Main App
-# --------------------------------------------------
 def main_app():
-    # Sidebar
     with st.sidebar:
         st.markdown("### 👤 User Profile")
         st.markdown(f"**Name:** {st.session_state.user['username']}")
         st.markdown(f"**Role:** {st.session_state.user['role'].upper()}")
         st.divider()
         
-        # Quick stats
         db = get_db()
         try:
             total_matches = db.query(Match).count()
@@ -798,12 +737,10 @@ def main_app():
 4. **Copy** and use!
         """)
 
-    # Main header
     st.markdown("# 📰 Magazine Automation")
     st.markdown(f"### Welcome back, **{st.session_state.user['username']}**! 👋")
     st.divider()
 
-    # Step 1: Input URLs
     st.markdown("## 🔗 Step 1: Add Match URLs")
     st.markdown("Paste PlayHQ match URLs below (one per line)")
     
@@ -838,7 +775,6 @@ def main_app():
                             )
                         )
                         
-                        # Show success in an expander
                         with st.expander(f"✅ {match['home_team']} vs {match['away_team']}", expanded=False):
                             col1, col2 = st.columns(2)
                             with col1:
@@ -866,7 +802,6 @@ def main_app():
                     st.success(f"🎉 Knowledge base created! {len(docs)} matches, {len(chunks)} chunks")
                     st.balloons()
 
-    # Step 2: Generate Content
     if "vectordb" in st.session_state:
         st.divider()
         st.markdown("## ✍️ Step 2: Generate Content")
@@ -885,14 +820,9 @@ def main_app():
         
         if generate_button:
             model_name = "gpt-4o-mini"
-            llm = ChatOpenAI(
-                model=model_name,
-                temperature=0.25,
-                max_tokens=1200
-            )
+            llm = ChatOpenAI(model=model_name, temperature=0.25, max_tokens=1200)
             retriever = st.session_state.vectordb.as_retriever(k=6)
 
-            # [The rest of the prompts remain the same - I'll include the magazine_prompt as example]
             magazine_prompt = """
 You are a professional Australian football journalist writing for a print magazine.
 
@@ -903,24 +833,11 @@ CRITICAL RULES - READ CAREFULLY:
 4. Do NOT invent or guess any player names
 5. Use the Period Scores table format exactly as shown in the context
 
-LADDER POSITION RULES (STRICT):
-- Ladder positions may be used ONLY if ladder data exists in database AND its date EXACTLY matches the match date being reported.
-- If ladder data is from any earlier date, previous round, or is not explicitly tied to the same match date, DO NOT mention the ladder at all.
-- When used, ladder positions must be stated factually and numerically only (e.g. "sitting second on the ladder").
-- Do NOT describe form, momentum, struggles, dominance, or season trajectory unless explicitly stated in the provided data.
-- Do NOT use subjective ladder language (e.g. "upper echelon", "struggling", "in form", "charging").
-- If both teams have valid ladder positions for the same date, mention both.
-- If only one team has valid ladder data for that date, mention ONLY that team.
-- If ladder data is missing, outdated, or unclear, omit ladder references entirely.
-
 OPENING PARAGRAPH - MUST BE CONTEXTUAL:
 Look at the "Match Competitiveness Analysis" in the context to determine the tone:
 - If margin ≤ 20 points: Use phrases like "In a closely fought contest", "In a tight encounter", or "In a thrilling clash"
 - If margin 21-40 points: Use phrases like "In a solid performance", "In a commanding display", "In a professional showing", or "In a one sided match"
 - If margin > 40 points: Use phrases like "In a dominant display", "In an emphatic victory", "In a comprehensive performance", or "In a one-sided affair"
-- If margin > 90 points: Use phrases like "In an absolute mauling", "In a complete thrashing"
-
-IMPORTANT: The opening MUST reflect the actual competitiveness of the match. Do NOT say "close encounter" if the margin was 50+ points!
 
 STRUCTURE (USE EXACT HEADINGS):
 
@@ -930,13 +847,7 @@ STRUCTURE (USE EXACT HEADINGS):
    - Optional third sentence: Additional match context or significance
    - Mention ONLY the venue (e.g., "at [Venue Name]")
    - Do NOT mention the date
-   - Do NOT mention the competition name (e.g., Adelaide Footy League)
-   - If ladder positions exist in database for same date as match, mention them naturally in the opening sentences
-   
-   Examples:
-   - "In a dominant display at Payneham Oval, Port District defeated Golden Grove by 51 points. The home side controlled the contest from start to finish, with their forwards proving too strong for the opposition defense."
-   
-   - "In a closely fought contest at West Lakes, Glenelg sitting third on the ladder edged out Sturt by 12 points. The match lived up to expectations with both teams trading blows throughout the four quarters."
+   - Do NOT mention the competition name
 
 2. Final Scores (EXACT HEADING)
    Use this exact table format:
@@ -975,18 +886,7 @@ STRUCTURE (USE EXACT HEADINGS):
 7. PLAYED AT (EXACT HEADING)
    [Venue name]
 
-STRICT RULES:
-- Opening paragraph MUST be 2-3 sentences (NOT just one sentence)
-- Opening paragraph MUST match the actual margin (close/comfortable/dominant)
-- Opening paragraph mentions ONLY venue - NO date, NO competition name
-- Use ONLY official player names - NO inventions
-- Use exact headings: "Final Scores", "MATCH SUMMARY", "FINAL WRAP-UP", "BEST PLAYERS", "GOAL SCORERS", "PLAYED AT"
-- Editorial language is allowed, but all facts must come from context
-
-LENGTH REQUIREMENT:
-- Total: 750–900 words
-- Do not exceed 950 words
-- Do not go below 700 words
+LENGTH REQUIREMENT: 750–900 words
 
 Context:
 {context}
@@ -994,17 +894,105 @@ Context:
 Write the magazine match report now.
 """
 
-            # [Include web_article_prompt and social_media_prompt here - same as before]
-            
-            web_article_prompt = """[Same as in previous response]"""
-            social_media_prompt = """[Same as in previous response]"""
+            web_article_prompt = """
+You are a digital sports journalist writing an engaging web article for an online audience.
 
-            # Select the appropriate prompt based on content type
+CRITICAL RULES:
+1. Use ONLY the exact best players listed in the "BEST PLAYERS (OFFICIAL)" section
+2. If best players show "Not available", write exactly: "Best players not available"
+3. Use ONLY the exact goal scorers listed in the "GOAL SCORERS (OFFICIAL)" section
+4. Do NOT invent or guess any player names
+
+WEB ARTICLE STRUCTURE:
+
+1. HEADLINE (Create a catchy, SEO-friendly headline)
+   - Use action words and the winning team's name
+
+2. LEAD PARAGRAPH (1-2 sentences)
+   - Summarize the match result immediately
+   - Include: Winner, loser, final score, venue
+
+3. KEY MOMENTS (Section heading)
+   - Write 3-4 short paragraphs about crucial moments
+   - Use subheadings for each moment
+   - Include specific scores and turning points
+
+4. PLAYER PERFORMANCES (Section heading)
+   - Highlight 2-3 standout players from OFFICIAL best players list
+   - If best players show "Not available", write: "Best players not available"
+
+5. THE STATS (Section heading)
+   Present key statistics in bullet points:
+   - Final Score: [Home] X defeated [Away] Y
+   - Margin: Z points
+   - Top Goal Scorers: [Use OFFICIAL list]
+   - Best Players: [Use OFFICIAL list OR "Best players not available"]
+   - Venue: [Venue name]
+
+6. WHAT IT MEANS (Section heading)
+   - 1-2 paragraphs on implications
+
+LENGTH: 500-650 words
+
+Context:
+{context}
+
+Write the web article now.
+"""
+
+            social_media_prompt = """
+You are a social media content creator writing an engaging long-form post about an AFL match.
+
+CRITICAL RULES:
+1. Use ONLY the exact best players listed in the "BEST PLAYERS (OFFICIAL)" section
+2. If best players show "Not available", write exactly: "Best players not available"
+3. Use ONLY the exact goal scorers listed in the "GOAL SCORERS (OFFICIAL)" section
+4. Do NOT invent or guess any player names
+
+SOCIAL MEDIA LONG-FORM POST STRUCTURE:
+
+1. ATTENTION-GRABBING OPENING (2-3 sentences)
+   - Start with emoji and excitement
+   - Announce the result with energy
+
+2. THE STORY (3-4 short paragraphs)
+   - Tell the match narrative quarter by quarter
+   - Use emojis strategically (⚡ 🎯 💪 🏆)
+   - Keep sentences short and punchy
+
+3. THE HEROES (1-2 paragraphs)
+   - Highlight 2-3 best players from OFFICIAL list
+   - If best players show "Not available", write: "Best players not available"
+
+4. BY THE NUMBERS (Formatted list)
+   📊 THE NUMBERS:
+   ⚽ Final Score: [Home] X-Y [Away]
+   📍 Venue: [Venue]
+   ⭐ Margin: Z points
+   🎯 Top Goal Kickers:
+   • [Home team goals - use OFFICIAL list]
+   • [Away team goals - use OFFICIAL list]
+   💎 Best Players:
+   • [Home team - use OFFICIAL list OR "Best players not available"]
+   • [Away team - use OFFICIAL list OR "Best players not available"]
+
+5. CLOSING HOOK (1-2 sentences)
+   - End with forward-looking statement
+   - Include relevant hashtags (3-5)
+
+LENGTH: 350-500 words
+
+Context:
+{context}
+
+Write the social media long-form post now. Remember to include hashtags at the end!
+"""
+
             if content_type == "Magazine match report":
                 prompt_text = magazine_prompt
             elif content_type == "Web article":
                 prompt_text = web_article_prompt
-            else:  # Social media long-form post
+            else:
                 prompt_text = social_media_prompt
 
             prompt_template = ChatPromptTemplate.from_template(prompt_text)
@@ -1012,7 +1000,6 @@ Write the magazine match report now.
             def format_docs(docs):
                 return "\n\n".join([d.page_content for d in docs])
 
-            # Modern LCEL chain
             chain = (
                 {"context": retriever | format_docs}
                 | prompt_template
@@ -1021,29 +1008,22 @@ Write the magazine match report now.
             )
 
             with st.spinner("✨ Generating professional content..."):
-                # Use the LLM with token tracking
                 with get_openai_callback() as cb:
                     result = chain.invoke("Generate a match report")
                     
-                    # Extract token usage
                     prompt_tokens = cb.prompt_tokens
                     completion_tokens = cb.completion_tokens
                     total_tokens = cb.total_tokens
-                    
-                    # Calculate cost
                     cost_usd = calculate_openai_cost(prompt_tokens, completion_tokens, model_name)
                     
-                    # Get match_id from the first document in vectordb (if available)
                     match_id = "unknown"
                     try:
-                        # Retrieve one document to get match_id from metadata
                         docs = retriever.get_relevant_documents("match")
                         if docs:
                             match_id = docs[0].metadata.get("match_id", "unknown")
                     except:
                         pass
                     
-                    # Save cost to database
                     save_generation_cost(
                         user_id=st.session_state.user['id'],
                         match_id=match_id,
@@ -1057,12 +1037,10 @@ Write the magazine match report now.
 
             st.markdown("## 📄 Generated Content")
             
-            # Display in a nice card
             st.markdown('<div class="content-card">', unsafe_allow_html=True)
             st.markdown(result)
             st.markdown('</div>', unsafe_allow_html=True)
 
-            # Stats
             word_count = len(result.split())
             char_count = len(result)
             
@@ -1074,14 +1052,9 @@ Write the magazine match report now.
             with col3:
                 st.metric("📄 Type", content_type.split()[0])
 
-            # Copy button
             st.text_area("📋 Copy Text", result, height=300)
-            
             st.success("✅ Content generated successfully!")
 
-# --------------------------------------------------
-# Run App
-# --------------------------------------------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
