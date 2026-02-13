@@ -5,7 +5,7 @@ import pandas as pd
 import os
 from datetime import datetime
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String, Text, func
+from sqlalchemy import create_engine, Column, Integer, String, Text, Float, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -41,6 +41,7 @@ class Match(Base):
     quarter_scores = Column(Text)
     lineups = Column(Text)
     goal_scorers = Column(Text)
+    best_players = Column(Text)
 
 class User(Base):
     __tablename__ = 'users'
@@ -50,6 +51,19 @@ class User(Base):
     role = Column(String(50), nullable=False)
     created_at = Column(String(255))
     last_login = Column(String(255))
+
+class GenerationCost(Base):
+    __tablename__ = 'generation_costs'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer)
+    match_id = Column(String(255))
+    content_type = Column(String(255))
+    prompt_tokens = Column(Integer)
+    completion_tokens = Column(Integer)
+    total_tokens = Column(Integer)
+    cost_usd = Column(Float)
+    model = Column(String(100))
+    generated_at = Column(String(255))
 
 Base.metadata.create_all(engine)
 SessionLocal = sessionmaker(bind=engine)
@@ -76,73 +90,264 @@ st.set_page_config(
 # --------------------------------------------------
 st.markdown("""
 <style>
-.stApp {
-    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-}
-
-/* Cards */
-.metric-card {
-    background: rgba(255, 255, 255, 0.95);
-    padding: 1.5rem;
-    border-radius: 16px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-    text-align: center;
-}
-
-.stat-number {
-    font-size: 2.5rem;
-    font-weight: 800;
-    color: #059669;
-    margin: 0.5rem 0;
-}
-
-.stat-label {
-    font-size: 0.9rem;
-    color: #64748b;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-/* Headers */
-h1, h2, h3 {
-    color: white !important;
-}
-
-/* Sidebar */
-section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
-}
-
-section[data-testid="stSidebar"] * {
-    color: white !important;
-}
-
-/* Tables */
-.stDataFrame {
-    background: white;
-    border-radius: 12px;
-    padding: 1rem;
-}
-
-/* Buttons */
-.stButton>button {
-    border-radius: 8px;
-    font-weight: 600;
-    transition: all 0.3s ease;
-}
-
-.stButton>button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-}
-
-/* Expanders */
-.streamlit-expanderHeader {
-    background: rgba(255, 255, 255, 0.95) !important;
-    border-radius: 12px !important;
-    font-weight: 600;
-}
+    /* Main background gradient */
+    .stApp {
+        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #06b6d4 100%);
+    }
+    
+    /* Remove default padding */
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    
+    /* Login card styling */
+    .login-card {
+        background: rgba(255, 255, 255, 0.98);
+        padding: 3rem;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(10px);
+    }
+    
+    /* Dashboard cards */
+    div[data-testid="stMetricValue"] {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1e40af;
+    }
+    
+    div[data-testid="stMetricLabel"] {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Metric containers */
+    div[data-testid="metric-container"] {
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        padding: 1.5rem;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(226, 232, 240, 0.8);
+        transition: all 0.3s ease;
+    }
+    
+    div[data-testid="metric-container"]:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 30px rgba(59, 130, 246, 0.2);
+        border-color: #3b82f6;
+    }
+    
+    /* Headers */
+    h1 {
+        color: #ffffff !important;
+        font-weight: 800 !important;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        margin-bottom: 1rem !important;
+    }
+    
+    h2 {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        padding: 1rem 0 0.5rem 0;
+        border-bottom: 3px solid rgba(255, 255, 255, 0.3);
+        margin-bottom: 1.5rem !important;
+    }
+    
+    h3 {
+        color: #1e40af !important;
+        font-weight: 600 !important;
+        margin-top: 1rem !important;
+    }
+    
+    /* Sidebar styling */
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #1e293b 0%, #334155 100%);
+    }
+    
+    section[data-testid="stSidebar"] > div {
+        background: transparent;
+    }
+    
+    /* Sidebar text */
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3,
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] label {
+        color: #ffffff !important;
+    }
+    
+    /* Radio buttons in sidebar */
+    section[data-testid="stSidebar"] div[role="radiogroup"] label {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 0.75rem 1rem;
+        border-radius: 10px;
+        margin: 0.3rem 0;
+        transition: all 0.3s ease;
+    }
+    
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+        background: rgba(59, 130, 246, 0.3);
+        transform: translateX(5px);
+    }
+    
+    /* Buttons */
+    .stButton > button {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: white;
+        border: none;
+        padding: 0.75rem 2rem;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    }
+    
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 25px rgba(59, 130, 246, 0.4);
+    }
+    
+    /* Input fields */
+    .stTextInput > div > div > input,
+    .stSelectbox > div > div > div,
+    .stDateInput > div > div > input {
+        border-radius: 10px;
+        border: 2px solid #e2e8f0;
+        padding: 0.75rem;
+        transition: all 0.3s ease;
+    }
+    
+    .stTextInput > div > div > input:focus,
+    .stSelectbox > div > div > div:focus,
+    .stDateInput > div > div > input:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    /* Expanders */
+    div[data-testid="stExpander"] {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        margin: 0.5rem 0;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    }
+    
+    div[data-testid="stExpander"]:hover {
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        border-color: #3b82f6;
+    }
+    
+    /* Dataframes */
+    div[data-testid="stDataFrame"] {
+        background: white;
+        border-radius: 12px;
+        padding: 1rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    }
+    
+    /* Dividers */
+    hr {
+        margin: 2rem 0;
+        border: none;
+        border-top: 2px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    /* Info/Success/Warning boxes */
+    .stAlert {
+        border-radius: 12px;
+        border-left: 4px solid;
+    }
+    
+    /* Success message */
+    .stSuccess {
+        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+        border-left-color: #10b981;
+    }
+    
+    /* Info message */
+    .stInfo {
+        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        border-left-color: #3b82f6;
+    }
+    
+    /* Warning message */
+    .stWarning {
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        border-left-color: #f59e0b;
+    }
+    
+    /* Error message */
+    .stError {
+        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+        border-left-color: #ef4444;
+    }
+    
+    /* Charts */
+    div[data-testid="stArrowVegaLiteChart"] {
+        background: white;
+        border-radius: 12px;
+        padding: 1rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    }
+    
+    /* Download button */
+    .stDownloadButton > button {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        border: none;
+        padding: 0.75rem 2rem;
+        border-radius: 12px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .stDownloadButton > button:hover {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        transform: translateY(-2px);
+    }
+    
+    /* Text area */
+    .stTextArea textarea {
+        border-radius: 10px;
+        border: 2px solid #e2e8f0;
+    }
+    
+    /* Captions */
+    .caption {
+        color: #64748b;
+        font-size: 0.875rem;
+        font-style: italic;
+        margin-top: 0.5rem;
+    }
+    
+    /* Custom badge */
+    .badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: white;
+    }
+    
+    /* Cost highlight */
+    .cost-highlight {
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #f59e0b;
+        font-weight: 600;
+        color: #92400e;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -168,7 +373,6 @@ def verify_admin_login(username, password):
             return {"id": user.id, "username": user.username, "role": user.role}
         return None
     except Exception as e:
-        print(f"Login error: {e}")
         return None
     finally:
         db.close()
@@ -178,33 +382,34 @@ def verify_admin_login(username, password):
 # --------------------------------------------------
 def login_page():
     st.markdown("<h1 style='text-align: center; margin-top: 3rem;'>⚙️ Admin Dashboard</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #94a3b8; font-size: 1.1rem;'>Administrator Access Only</p>", unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown("<div style='background: rgba(255,255,255,0.95); padding: 2rem; border-radius: 16px; margin-top: 2rem;'>", unsafe_allow_html=True)
+        st.markdown('<div class="login-card">', unsafe_allow_html=True)
+        st.markdown("### 🔐 Administrator Access")
+        st.markdown("Please sign in with your admin credentials")
         
-        username = st.text_input("🔐 Admin Username", placeholder="Enter username")
-        password = st.text_input("🔑 Password", type="password", placeholder="Enter password")
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        username = st.text_input("👤 Admin Username", placeholder="Enter username")
+        password = st.text_input("🔒 Password", type="password", placeholder="Enter password")
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        if st.button("🚀 Login to Dashboard", use_container_width=True, type="primary"):
+        if st.button("🚀 Sign In", use_container_width=True):
             admin = verify_admin_login(username, password)
             if admin:
                 st.session_state.admin_logged_in = True
                 st.session_state.admin = admin
-                st.success(f"✅ Welcome, {admin['username']}!")
+                st.success(f"✅ Welcome back, {admin['username']}!")
                 st.balloons()
                 st.rerun()
             else:
                 st.error("❌ Invalid credentials or insufficient permissions")
 
         st.markdown("<br>", unsafe_allow_html=True)
-        with st.expander("ℹ️ Default Credentials"):
-            st.code("Username: admin\nPassword: admin123")
-        
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.info("💡 **Default credentials:** admin / admin123")
+        st.markdown('</div>', unsafe_allow_html=True)
 
 def logout():
     st.session_state.admin_logged_in = False
@@ -215,131 +420,334 @@ def logout():
 # Dashboard Pages
 # --------------------------------------------------
 def show_statistics():
-    st.markdown("## 📊 System Overview")
+    st.header("📊 System Overview")
     st.markdown("<br>", unsafe_allow_html=True)
 
     db = get_db()
     try:
+        # First row - Basic stats
+        col1, col2, col3, col4 = st.columns(4)
+
         total_users = db.query(User).count()
+        col1.metric("👥 Total Users", total_users)
+
         total_matches = db.query(Match).count()
-        admin_count = db.query(User).filter_by(role='admin').count()
-    finally:
-        db.close()
+        col2.metric("🏈 Total Matches", total_matches)
 
-    col1, col2, col3 = st.columns(3)
+        # Recent matches (last 7 days)
+        from datetime import timedelta
+        seven_days_ago = (datetime.utcnow() - timedelta(days=7)).isoformat()
+        recent_matches = db.query(Match).filter(Match.extracted_at >= seven_days_ago).count()
+        col3.metric("📅 Matches (7 Days)", recent_matches)
 
-    with col1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div style="font-size: 2.5rem;">👥</div>
-            <div class="stat-number">{total_users}</div>
-            <div class="stat-label">Total Users</div>
-        </div>
-        """, unsafe_allow_html=True)
+        total_generations = db.query(GenerationCost).count()
+        col4.metric("✨ Generations", total_generations)
 
-    with col2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div style="font-size: 2.5rem;">🏈</div>
-            <div class="stat-number">{total_matches}</div>
-            <div class="stat-label">Total Matches</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col3:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div style="font-size: 2.5rem;">⚙️</div>
-            <div class="stat-number">{admin_count}</div>
-            <div class="stat-label">Administrators</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("<br><br>", unsafe_allow_html=True)
-
-    # Recent Activity
-    st.markdown("### 📋 Recent Activity")
-    
-    db = get_db()
-    try:
-        recent_matches = db.query(Match).order_by(Match.extracted_at.desc()).limit(5).all()
-        
-        if recent_matches:
-            for match in recent_matches:
-                with st.expander(f"🏈 {match.home_team} vs {match.away_team} - {match.date}"):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.write(f"**Competition:** {match.competition}")
-                        st.write(f"**Venue:** {match.venue}")
-                    with col2:
-                        st.write(f"**Final Score:** {match.home_final_score} - {match.away_final_score}")
-                        st.write(f"**Margin:** {match.margin} points")
-        else:
-            st.info("No matches recorded yet")
-    finally:
-        db.close()
-
-# --------------------------------------------------
-# Analytics
-# --------------------------------------------------
-def show_analytics():
-    st.markdown("## 📈 Analytics & Insights")
-
-    db = get_db()
-    
-    try:
-        # Matches by competition
-        st.markdown("### 🏆 Matches by Competition")
-        
-        results = db.query(
-            Match.competition, 
-            func.count(Match.id).label('total')
-        ).group_by(Match.competition).all()
-        
-        if results:
-            df = pd.DataFrame(results, columns=['competition', 'total'])
-            st.bar_chart(df.set_index('competition'))
-        else:
-            st.info("No competition data available")
-
+        st.markdown("<br>", unsafe_allow_html=True)
         st.divider()
 
-        # User roles distribution
-        st.markdown("### 👥 User Roles Distribution")
+        # Second row - Cost statistics
+        st.subheader("💰 Content Generation Costs")
+        st.markdown("<br>", unsafe_allow_html=True)
         
-        user_results = db.query(
-            User.role, 
-            func.count(User.id).label('total')
-        ).group_by(User.role).all()
+        col1, col2, col3, col4 = st.columns(4)
+
+        # Total cost this month
+        current_month = datetime.utcnow().strftime('%Y-%m')
+        current_month_cost = db.query(func.sum(GenerationCost.cost_usd)).filter(
+            func.substr(GenerationCost.generated_at, 1, 7) == current_month
+        ).scalar() or 0.0
+        col1.metric("💵 This Month", f"${current_month_cost:.4f}")
+
+        # Total cost all time
+        total_cost = db.query(func.sum(GenerationCost.cost_usd)).scalar() or 0.0
+        col2.metric("💎 All Time", f"${total_cost:.4f}")
+
+        # Average cost per generation
+        avg_cost = db.query(func.avg(GenerationCost.cost_usd)).scalar() or 0.0
+        col3.metric("📊 Avg Cost", f"${avg_cost:.6f}")
+
+        # Generations this month
+        monthly_generations = db.query(GenerationCost).filter(
+            func.substr(GenerationCost.generated_at, 1, 7) == current_month
+        ).count()
+        col4.metric("🔄 Monthly Gen", monthly_generations)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.divider()
+
+        # Recent generations table
+        st.subheader("🕒 Recent Generations")
+        st.markdown("<br>", unsafe_allow_html=True)
         
-        if user_results:
-            df_users = pd.DataFrame(user_results, columns=['role', 'total'])
+        recent_gens = db.query(
+            GenerationCost.generated_at,
+            User.username,
+            GenerationCost.content_type,
+            GenerationCost.prompt_tokens,
+            GenerationCost.completion_tokens,
+            GenerationCost.total_tokens,
+            GenerationCost.cost_usd,
+            GenerationCost.model
+        ).outerjoin(User, GenerationCost.user_id == User.id)\
+         .order_by(GenerationCost.generated_at.desc())\
+         .limit(10).all()
+
+        if recent_gens:
+            df = pd.DataFrame(recent_gens, columns=[
+                "Date", "User", "Content Type", "Prompt Tokens", 
+                "Completion Tokens", "Total Tokens", "Cost (USD)", "Model"
+            ])
+            df["Date"] = pd.to_datetime(df["Date"]).dt.strftime("%Y-%m-%d %H:%M")
+            df["Cost (USD)"] = df["Cost (USD)"].apply(lambda x: f"${x:.6f}")
+            st.dataframe(df, use_container_width=True, height=400)
+        else:
+            st.info("📭 No generation history yet")
+    finally:
+        db.close()
+
+# --------------------------------------------------
+# Analytics (GRAPHS)
+# --------------------------------------------------
+def show_analytics():
+    st.header("📈 Analytics & Insights")
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    db = get_db()
+    try:
+        # Cost over time
+        st.subheader("💰 Cost Over Time (Daily)")
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        results = db.query(
+            func.date(GenerationCost.generated_at).label('day'),
+            func.sum(GenerationCost.cost_usd).label('total_cost'),
+            func.count(GenerationCost.id).label('generations')
+        ).group_by(func.date(GenerationCost.generated_at))\
+         .order_by(func.date(GenerationCost.generated_at)).all()
+
+        if results:
+            df = pd.DataFrame(results, columns=['day', 'total_cost', 'generations'])
+            df["day"] = pd.to_datetime(df["day"])
             
             col1, col2 = st.columns(2)
             with col1:
-                st.bar_chart(df_users.set_index('role'))
+                st.line_chart(df.set_index("day")["total_cost"], height=300)
+                st.markdown('<p class="caption">📊 Daily Cost ($)</p>', unsafe_allow_html=True)
             with col2:
-                for role, count in user_results:
-                    st.metric(f"{role.upper()}", count)
+                st.line_chart(df.set_index("day")["generations"], height=300)
+                st.markdown('<p class="caption">🔄 Daily Generations</p>', unsafe_allow_html=True)
         else:
-            st.info("No user data available")
+            st.info("📭 No cost data available")
 
         st.divider()
 
-        # Top venues
-        st.markdown("### 🏟️ Top Venues")
+        # Cost by content type
+        st.subheader("📝 Cost by Content Type")
+        st.markdown("<br>", unsafe_allow_html=True)
         
-        venue_results = db.query(
-            Match.venue, 
-            func.count(Match.id).label('total')
-        ).group_by(Match.venue).order_by(func.count(Match.id).desc()).limit(10).all()
-        
-        if venue_results:
-            df_venues = pd.DataFrame(venue_results, columns=['venue', 'total'])
-            st.dataframe(df_venues, use_container_width=True, hide_index=True)
-        else:
-            st.info("No venue data available")
+        results = db.query(
+            GenerationCost.content_type,
+            func.count(GenerationCost.id).label('generations'),
+            func.sum(GenerationCost.cost_usd).label('total_cost'),
+            func.avg(GenerationCost.cost_usd).label('avg_cost')
+        ).group_by(GenerationCost.content_type)\
+         .order_by(func.sum(GenerationCost.cost_usd).desc()).all()
 
+        if results:
+            df = pd.DataFrame(results, columns=['content_type', 'generations', 'total_cost', 'avg_cost'])
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.bar_chart(df.set_index("content_type")["total_cost"], height=300)
+                st.markdown('<p class="caption">💵 Total Cost by Type ($)</p>', unsafe_allow_html=True)
+            with col2:
+                st.dataframe(df, use_container_width=True, height=300)
+        else:
+            st.info("📭 No content type data available")
+
+        st.divider()
+
+        # Cost by user
+        st.subheader("👤 Cost by User")
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        results = db.query(
+            User.username,
+            func.count(GenerationCost.id).label('generations'),
+            func.sum(GenerationCost.cost_usd).label('total_cost'),
+            func.avg(GenerationCost.cost_usd).label('avg_cost')
+        ).outerjoin(GenerationCost, User.id == GenerationCost.user_id)\
+         .group_by(User.username)\
+         .order_by(func.sum(GenerationCost.cost_usd).desc()).all()
+
+        if results:
+            df = pd.DataFrame(results, columns=['username', 'generations', 'total_cost', 'avg_cost'])
+            st.dataframe(df, use_container_width=True, height=300)
+        else:
+            st.info("📭 No user cost data available")
+
+        st.divider()
+
+        # Matches over time
+        st.subheader("🏈 Matches Created Over Time")
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        results = db.query(
+            func.date(Match.extracted_at).label('day'),
+            func.count(Match.id).label('total')
+        ).group_by(func.date(Match.extracted_at))\
+         .order_by(func.date(Match.extracted_at)).all()
+
+        if results:
+            df = pd.DataFrame(results, columns=['day', 'total'])
+            df["day"] = pd.to_datetime(df["day"])
+            st.line_chart(df.set_index("day"), height=300)
+        else:
+            st.info("📭 No match data available")
+
+        st.divider()
+
+        # Matches by competition
+        st.subheader("🏆 Matches by Competition")
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        results = db.query(
+            Match.competition,
+            func.count(Match.id).label('total')
+        ).group_by(Match.competition)\
+         .order_by(func.count(Match.id).desc()).all()
+
+        if results:
+            df = pd.DataFrame(results, columns=['competition', 'total'])
+            st.bar_chart(df.set_index("competition"), height=300)
+        else:
+            st.info("📭 No competition data available")
+
+        st.divider()
+
+        # User roles
+        st.subheader("👥 User Roles Distribution")
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        results = db.query(
+            User.role,
+            func.count(User.id).label('total')
+        ).group_by(User.role).all()
+
+        if results:
+            df = pd.DataFrame(results, columns=['role', 'total'])
+            st.bar_chart(df.set_index("role"), height=300)
+        else:
+            st.info("📭 No user data available")
+    finally:
+        db.close()
+
+# --------------------------------------------------
+# Cost Management Page
+# --------------------------------------------------
+def show_cost_management():
+    st.header("💰 Cost Management")
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    db = get_db()
+    try:
+        # Monthly breakdown
+        st.subheader("📅 Monthly Cost Breakdown")
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        results = db.query(
+            func.substr(GenerationCost.generated_at, 1, 7).label('month'),
+            func.count(GenerationCost.id).label('generations'),
+            func.sum(GenerationCost.cost_usd).label('total_cost'),
+            func.avg(GenerationCost.cost_usd).label('avg_cost'),
+            func.sum(GenerationCost.prompt_tokens).label('total_prompt_tokens'),
+            func.sum(GenerationCost.completion_tokens).label('total_completion_tokens'),
+            func.sum(GenerationCost.total_tokens).label('total_tokens')
+        ).group_by(func.substr(GenerationCost.generated_at, 1, 7))\
+         .order_by(func.substr(GenerationCost.generated_at, 1, 7).desc()).all()
+
+        if results:
+            df = pd.DataFrame(results, columns=[
+                'month', 'generations', 'total_cost', 'avg_cost',
+                'total_prompt_tokens', 'total_completion_tokens', 'total_tokens'
+            ])
+            df["total_cost"] = df["total_cost"].apply(lambda x: f"${x:.4f}")
+            df["avg_cost"] = df["avg_cost"].apply(lambda x: f"${x:.6f}")
+            st.dataframe(df, use_container_width=True, height=400)
+        else:
+            st.info("📭 No cost data available")
+
+        st.divider()
+
+        # Model usage
+        st.subheader("🤖 Model Usage & Costs")
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        results = db.query(
+            GenerationCost.model,
+            func.count(GenerationCost.id).label('generations'),
+            func.sum(GenerationCost.cost_usd).label('total_cost'),
+            func.avg(GenerationCost.cost_usd).label('avg_cost'),
+            func.sum(GenerationCost.total_tokens).label('total_tokens')
+        ).group_by(GenerationCost.model)\
+         .order_by(func.sum(GenerationCost.cost_usd).desc()).all()
+
+        if results:
+            df = pd.DataFrame(results, columns=['model', 'generations', 'total_cost', 'avg_cost', 'total_tokens'])
+            df["total_cost"] = df["total_cost"].apply(lambda x: f"${x:.6f}")
+            df["avg_cost"] = df["avg_cost"].apply(lambda x: f"${x:.6f}")
+            st.dataframe(df, use_container_width=True, height=300)
+        else:
+            st.info("📭 No model usage data available")
+
+        st.divider()
+
+        # Export costs
+        st.subheader("📥 Export Cost Data")
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            start_date = st.date_input("📅 Start Date", value=pd.Timestamp.now().date().replace(day=1))
+        with col2:
+            end_date = st.date_input("📅 End Date", value=pd.Timestamp.now().date())
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        if st.button("📥 Export to CSV", use_container_width=True):
+            results = db.query(
+                GenerationCost.generated_at,
+                User.username,
+                GenerationCost.content_type,
+                GenerationCost.prompt_tokens,
+                GenerationCost.completion_tokens,
+                GenerationCost.total_tokens,
+                GenerationCost.cost_usd,
+                GenerationCost.model,
+                GenerationCost.match_id
+            ).outerjoin(User, GenerationCost.user_id == User.id)\
+             .filter(func.date(GenerationCost.generated_at).between(start_date, end_date))\
+             .order_by(GenerationCost.generated_at.desc()).all()
+            
+            if results:
+                df = pd.DataFrame(results, columns=[
+                    'generated_at', 'username', 'content_type', 'prompt_tokens',
+                    'completion_tokens', 'total_tokens', 'cost_usd', 'model', 'match_id'
+                ])
+                
+                csv = df.to_csv(index=False)
+                st.download_button(
+                    label="💾 Download CSV File",
+                    data=csv,
+                    file_name=f"generation_costs_{start_date}_{end_date}.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+                st.success(f"✅ Ready to download! {len(df)} records found.")
+            else:
+                st.warning("⚠️ No data available for the selected date range")
     finally:
         db.close()
 
@@ -347,20 +755,20 @@ def show_analytics():
 # User Management
 # --------------------------------------------------
 def manage_users():
-    st.markdown("## 👥 User Management")
+    st.header("👥 User Management")
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    with st.expander("➕ Add New User", expanded=False):
-        col1, col2 = st.columns(2)
+    with st.expander("➕ Add New User"):
+        st.markdown("### Create New User Account")
+        st.markdown("<br>", unsafe_allow_html=True)
         
-        with col1:
-            username = st.text_input("Username")
-            role = st.selectbox("Role", ["user", "admin"])
-        
-        with col2:
-            password = st.text_input("Password", type="password")
-            st.markdown("<br>", unsafe_allow_html=True)
+        username = st.text_input("👤 Username", placeholder="Enter username")
+        password = st.text_input("🔒 Password", type="password", placeholder="Enter secure password")
+        role = st.selectbox("🎭 Role", ["user", "admin"])
 
-        if st.button("✅ Create User", type="primary"):
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        if st.button("✨ Create User", use_container_width=True):
             if username and password:
                 db = get_db()
                 try:
@@ -376,7 +784,8 @@ def manage_users():
                         )
                         db.add(new_user)
                         db.commit()
-                        st.success(f"✅ User '{username}' created successfully!")
+                        st.success("✅ User created successfully!")
+                        st.balloons()
                         st.rerun()
                 except Exception as e:
                     db.rollback()
@@ -386,55 +795,59 @@ def manage_users():
             else:
                 st.error("⚠️ Please fill all fields")
 
+    st.markdown("<br>", unsafe_allow_html=True)
     st.divider()
-    st.markdown("### 📋 All Users")
 
+    # Users table with cost info
+    st.subheader("📋 All Users")
+    st.markdown("<br>", unsafe_allow_html=True)
+    
     db = get_db()
     try:
-        users = db.query(User).order_by(User.created_at.desc()).all()
+        users = db.query(
+            User.id,
+            User.username,
+            User.role,
+            User.created_at,
+            User.last_login,
+            func.count(GenerationCost.id).label('generations'),
+            func.sum(GenerationCost.cost_usd).label('total_cost')
+        ).outerjoin(GenerationCost, User.id == GenerationCost.user_id)\
+         .group_by(User.id)\
+         .order_by(User.created_at.desc()).all()
 
-        if users:
-            # Header
-            col1, col2, col3, col4, col5 = st.columns([2, 1, 2, 2, 1])
-            col1.markdown("**👤 Username**")
-            col2.markdown("**🎭 Role**")
-            col3.markdown("**📅 Created**")
-            col4.markdown("**🕐 Last Login**")
-            col5.markdown("**⚙️ Action**")
-            
-            st.divider()
-
-            # Users list
-            for user in users:
-                col1, col2, col3, col4, col5 = st.columns([2, 1, 2, 2, 1])
+        for u in users:
+            with st.expander(f"👤 {u[1]} · {u[2].upper()}"):
+                col1, col2, col3 = st.columns(3)
                 
-                col1.write(f"**{user.username}**")
+                with col1:
+                    st.markdown("**📅 Account Info**")
+                    st.write(f"Created: {u[3][:10] if u[3] else 'N/A'}")
+                    st.write(f"Last Login: {u[4][:10] if u[4] else 'Never'}")
                 
-                if user.role == 'admin':
-                    col2.markdown("🔴 **Admin**")
-                else:
-                    col2.write("🟢 User")
+                with col2:
+                    st.markdown("**📊 Usage Stats**")
+                    st.write(f"Generations: {u[5] or 0}")
+                    st.markdown(f'<div class="cost-highlight">Total Cost: ${(u[6] or 0):.6f}</div>', unsafe_allow_html=True)
                 
-                col3.write(user.created_at[:10] if user.created_at else "N/A")
-                col4.write(user.last_login[:10] if user.last_login else "Never")
-
-                with col5:
-                    if user.username != "admin":
-                        if st.button("🗑️", key=f"del_{user.id}"):
+                with col3:
+                    st.markdown("**⚙️ Actions**")
+                    if u[1] != "admin":
+                        if st.button("🗑️ Delete User", key=f"del_{u[0]}", use_container_width=True):
                             db_del = get_db()
                             try:
-                                user_to_delete = db_del.query(User).filter_by(id=user.id).first()
+                                user_to_delete = db_del.query(User).filter_by(id=u[0]).first()
                                 if user_to_delete:
+                                    # Delete related costs
+                                    db_del.query(GenerationCost).filter_by(user_id=u[0]).delete()
                                     db_del.delete(user_to_delete)
                                     db_del.commit()
-                                    st.success("User deleted!")
+                                    st.success("✅ User deleted")
                                     st.rerun()
                             finally:
                                 db_del.close()
                     else:
-                        col5.write("🔒")
-        else:
-            st.info("No users found")
+                        st.info("🔒 Protected Account")
     finally:
         db.close()
 
@@ -442,74 +855,64 @@ def manage_users():
 # Match Management
 # --------------------------------------------------
 def manage_matches():
-    st.markdown("## 🏈 Match Management")
+    st.header("🏈 Match Management")
+    st.markdown("<br>", unsafe_allow_html=True)
 
     db = get_db()
     try:
-        total_matches = db.query(Match).count()
-        st.markdown(f"**Total Matches:** {total_matches}")
-        
-        st.divider()
-
         matches = db.query(Match).order_by(Match.date.desc()).all()
 
-        if matches:
-            for match in matches:
-                with st.expander(f"🏈 {match.home_team} vs {match.away_team} ({match.date})"):
-                    col1, col2 = st.columns(2)
+        st.info(f"📊 Total Matches: {len(matches)}")
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        for m in matches:
+            with st.expander(f"🏈 {m.home_team} vs {m.away_team} · {m.date}"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("**📋 Match Details**")
+                    st.write(f"🏆 Competition: {m.competition}")
+                    st.write(f"📍 Venue: {m.venue}")
+                    st.write(f"📊 Score: **{m.home_team} {m.home_final_score}** – **{m.away_team} {m.away_final_score}**")
+                
+                with col2:
+                    st.markdown("**⚽ Goal Scorers**")
+                    if m.goal_scorers:
+                        scorers = json.loads(m.goal_scorers)
+                        for team, team_scorers in scorers.items():
+                            st.write(f"**{team}:**")
+                            if team_scorers:
+                                for scorer in team_scorers:
+                                    st.write(f"  • {scorer}")
+                            else:
+                                st.write("  None")
                     
-                    with col1:
-                        st.write(f"**Competition:** {match.competition}")
-                        st.write(f"**Venue:** {match.venue}")
-                        st.write(f"**Date:** {match.date}")
-                    
-                    with col2:
-                        st.write(f"**Final Score:** {match.home_team} {match.home_final_score} – {match.away_team} {match.away_final_score}")
-                        st.write(f"**Margin:** {match.margin} points")
-
-                    st.divider()
-
-                    # Quarter scores
-                    if match.quarter_scores:
-                        quarter_data = json.loads(match.quarter_scores)
-                        st.write("**Quarter Scores:**")
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.write(f"**{match.home_team}:**")
-                            for q, score in quarter_data.get('home', {}).items():
-                                st.write(f"{q}: {score}")
-                        with col2:
-                            st.write(f"**{match.away_team}:**")
-                            for q, score in quarter_data.get('away', {}).items():
-                                st.write(f"{q}: {score}")
-
-                    # Goal scorers
-                    if match.goal_scorers:
-                        scorers = json.loads(match.goal_scorers)
-                        st.write("**Goal Scorers:**")
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.write(f"**{match.home_team}:**")
-                            st.write(", ".join(scorers.get('home', [])) if scorers.get('home') else "None")
-                        with col2:
-                            st.write(f"**{match.away_team}:**")
-                            st.write(", ".join(scorers.get('away', [])) if scorers.get('away') else "None")
-
                     st.markdown("<br>", unsafe_allow_html=True)
                     
-                    if st.button("🗑️ Delete Match", key=f"match_{match.id}", type="secondary"):
-                        db_del = get_db()
-                        try:
-                            match_to_delete = db_del.query(Match).filter_by(id=match.id).first()
-                            if match_to_delete:
-                                db_del.delete(match_to_delete)
-                                db_del.commit()
-                                st.success("Match deleted!")
-                                st.rerun()
-                        finally:
-                            db_del.close()
-        else:
-            st.info("No matches found")
+                    if m.best_players:
+                        st.markdown("**⭐ Best Players**")
+                        best_players = json.loads(m.best_players)
+                        for team, players in best_players.items():
+                            st.write(f"**{team}:**")
+                            if players:
+                                for player in players:
+                                    st.write(f"  • {player}")
+                            else:
+                                st.write("  Not available")
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                if st.button("🗑️ Delete Match", key=f"match_{m.id}", use_container_width=True):
+                    db_del = get_db()
+                    try:
+                        match_to_delete = db_del.query(Match).filter_by(id=m.id).first()
+                        if match_to_delete:
+                            db_del.delete(match_to_delete)
+                            db_del.commit()
+                            st.success("✅ Match deleted")
+                            st.rerun()
+                    finally:
+                        db_del.close()
     finally:
         db.close()
 
@@ -517,33 +920,32 @@ def manage_matches():
 # Admin Dashboard
 # --------------------------------------------------
 def admin_dashboard():
-    # Header
-    col1, col2 = st.columns([4, 1])
+    st.title("⚙️ Admin Dashboard")
+    
+    col1, col2 = st.columns([3, 1])
     with col1:
-        st.markdown("# ⚙️ Admin Dashboard")
-        st.markdown(f"Welcome back, **{st.session_state.admin['username']}** 👋")
+        st.markdown(f'<span class="badge">👤 {st.session_state.admin["username"]} · {st.session_state.admin["role"].upper()}</span>', unsafe_allow_html=True)
     with col2:
-        st.markdown("<br>", unsafe_allow_html=True)
         if st.button("🚪 Logout", use_container_width=True):
             logout()
 
     st.divider()
 
-    # Sidebar Navigation
-    st.sidebar.markdown("## 📋 Navigation")
+    st.sidebar.title("📋 Navigation")
     st.sidebar.markdown("<br>", unsafe_allow_html=True)
     
     page = st.sidebar.radio(
         "Select Page",
-        ["📊 Dashboard", "📈 Analytics", "👥 Users", "🏈 Matches"],
+        ["📊 Dashboard", "📈 Analytics", "💰 Cost Management", "👥 Users", "🏈 Matches"],
         label_visibility="collapsed"
     )
 
-    # Page routing
     if page == "📊 Dashboard":
         show_statistics()
     elif page == "📈 Analytics":
         show_analytics()
+    elif page == "💰 Cost Management":
+        show_cost_management()
     elif page == "👥 Users":
         manage_users()
     elif page == "🏈 Matches":
