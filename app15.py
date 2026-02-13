@@ -194,7 +194,7 @@ def login_page():
         
         st.markdown("&nbsp;", unsafe_allow_html=True)
         
-        if st.button("🚀 Sign In"):
+        if st.button("🚀 Sign In", use_container_width=True):
             if username and password:
                 user = verify_login(username, password)
                 if user:
@@ -207,11 +207,6 @@ def login_page():
                     st.error("❌ Invalid username or password")
             else:
                 st.warning("⚠️ Please enter both username and password")
-        
-        st.markdown("&nbsp;", unsafe_allow_html=True)
-        
-        with st.expander("ℹ️ Default Credentials"):
-            st.code("Username: admin\nPassword: admin123")
         
         st.markdown('</div>', unsafe_allow_html=True)
     
