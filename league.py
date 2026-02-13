@@ -71,11 +71,9 @@ def migrate_database():
     """Add any missing columns to existing tables"""
     inspector = inspect(engine)
     
-    # Check if ladder table exists
     if 'ladder' in inspector.get_table_names():
         existing_columns = [col['name'] for col in inspector.get_columns('ladder')]
         
-        # Add byes column if it doesn't exist
         if 'byes' not in existing_columns:
             try:
                 with engine.connect() as conn:
@@ -85,7 +83,6 @@ def migrate_database():
             except Exception as e:
                 print(f"⚠️ Could not add byes column: {e}")
 
-# Run migrations
 migrate_database()
 
 SessionLocal = sessionmaker(bind=engine)
@@ -107,13 +104,11 @@ st.markdown("""
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     }
     
-    /* Headers */
     h1, h2, h3 {
         color: white !important;
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
     }
     
-    /* Sidebar */
     section[data-testid="stSidebar"] {
         background: linear-gradient(180deg, #1e293b 0%, #334155 100%);
     }
@@ -122,7 +117,6 @@ st.markdown("""
         color: white !important;
     }
     
-    /* Cards */
     .stDataFrame {
         background: white;
         border-radius: 12px;
@@ -130,7 +124,6 @@ st.markdown("""
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
     }
     
-    /* Buttons */
     .stButton>button {
         background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
         color: white;
@@ -147,14 +140,12 @@ st.markdown("""
         box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
     }
     
-    /* Input fields */
     .stTextInput>div>div>input {
         border-radius: 10px;
         border: 2px solid #e2e8f0;
         padding: 0.75rem;
     }
     
-    /* Success/Error messages */
     .stSuccess {
         background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
         border-left-color: #10b981;
@@ -177,6 +168,21 @@ st.markdown("""
         background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
         border-left-color: #f59e0b;
         border-radius: 12px;
+    }
+    
+    div[data-testid="metric-container"] {
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        padding: 1.5rem;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(226, 232, 240, 0.8);
+    }
+    
+    div[data-testid="stExpander"] {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -327,7 +333,6 @@ def sync_ladder(grade_id, grade_name, season):
             round_name = block["generatedFrom"]["name"]
 
             for idx, row in enumerate(block["standings"], start=1):
-                # Check if entry exists
                 existing = db.query(Ladder).filter_by(
                     team_id=row["team"]["id"],
                     season=season,
@@ -335,7 +340,6 @@ def sync_ladder(grade_id, grade_name, season):
                 ).first()
 
                 if existing:
-                    # Update existing
                     existing.grade_id = grade_id
                     existing.grade_name = grade_name
                     existing.round_name = round_name
@@ -350,7 +354,6 @@ def sync_ladder(grade_id, grade_name, season):
                     existing.percentage = row["alternatePercentage"]
                     existing.synced_at = synced_at
                 else:
-                    # Create new
                     new_entry = Ladder(
                         grade_id=grade_id,
                         grade_name=grade_name,
@@ -432,7 +435,6 @@ def logout():
 # MAIN APP
 # --------------------------------------------------
 def main_app():
-    # Header
     col1, col2 = st.columns([4, 1])
     with col1:
         st.markdown("# 🏈 League Info & Ladder")
@@ -444,7 +446,6 @@ def main_app():
 
     st.divider()
 
-    # Sidebar controls
     with st.sidebar:
         st.markdown("### 👤 User Profile")
         st.markdown(f"**Name:** {st.session_state.user['username']}")
@@ -473,19 +474,16 @@ def main_app():
                         return
                     
                     sync_ladder(meta["id"], meta["name"], meta["season"])
-                    st.success(f"✅ {meta['name']} ({meta['season']}) synced!")
                     st.rerun()
         else:
             if league_url:
                 st.error("❌ Invalid PlayHQ URL")
 
-    # Main content
     st.markdown("## 🏆 League Ladder")
 
     if grade_id:
         db = get_db()
         try:
-            # Get ladder data
             results = db.query(
                 Ladder.rank,
                 Ladder.team_name,
@@ -504,7 +502,6 @@ def main_app():
                     "Rank", "Team", "P", "PTS", "%", "W", "L", "D", "BYE"
                 ])
                 
-                # Display metadata
                 meta_info = db.query(Ladder).filter_by(grade_id=grade_id).first()
                 if meta_info:
                     col1, col2, col3 = st.columns(3)
@@ -514,7 +511,6 @@ def main_app():
                     
                     st.markdown("<br>", unsafe_allow_html=True)
                 
-                # Display ladder
                 st.dataframe(
                     df,
                     use_container_width=True,
@@ -542,7 +538,6 @@ def main_app():
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # Instructions
         with st.expander("📖 How to Use"):
             st.markdown("""
             ### Steps:
