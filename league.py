@@ -419,11 +419,6 @@ def login_page():
             else:
                 st.warning("⚠️ Please enter both username and password")
         
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        with st.expander("ℹ️ Default Credentials"):
-            st.code("Username: admin\nPassword: admin123")
-        
         st.markdown("</div>", unsafe_allow_html=True)
 
 def logout():
