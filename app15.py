@@ -5,7 +5,7 @@ import hashlib
 import os
 from datetime import datetime
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String, Text, Float, inspect
+from sqlalchemy import create_engine, Column, Integer, String, Text, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -32,7 +32,6 @@ if DATABASE_URL.startswith('postgres://'):
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 Base = declarative_base()
 
-# Define models
 class Match(Base):
     __tablename__ = 'matches'
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -73,29 +72,7 @@ class GenerationCost(Base):
     model = Column(String(100))
     generated_at = Column(String(255))
 
-# Migration function to add missing columns
-def migrate_database():
-    """Add any missing columns to existing tables"""
-    inspector = inspect(engine)
-    
-    # Check if matches table exists
-    if 'matches' in inspector.get_table_names():
-        existing_columns = [col['name'] for col in inspector.get_columns('matches')]
-        
-        # Add best_players column if it doesn't exist
-        if 'best_players' not in existing_columns:
-            try:
-                with engine.connect() as conn:
-                    conn.execute(text("ALTER TABLE matches ADD COLUMN best_players TEXT"))
-                    conn.commit()
-                print("✅ Added best_players column to matches table")
-            except Exception as e:
-                print(f"⚠️ Could not add best_players column: {e}")
-
-# Create tables and run migrations
 Base.metadata.create_all(engine)
-migrate_database()
-
 SessionLocal = sessionmaker(bind=engine)
 
 def get_db():
@@ -174,7 +151,6 @@ def create_default_admin():
             db.commit()
     except Exception as e:
         db.rollback()
-        print(f"Error creating admin: {e}")
     finally:
         db.close()
 
@@ -195,7 +171,6 @@ def verify_login(username, password):
             return {"id": user.id, "username": user.username, "role": user.role}
         return None
     except Exception as e:
-        print(f"Login error: {e}")
         return None
     finally:
         db.close()
@@ -543,7 +518,6 @@ def save_match_to_db(match):
             db.commit()
     except Exception as e:
         db.rollback()
-        print(f"Error saving match: {e}")
     finally:
         db.close()
 
@@ -699,7 +673,6 @@ def save_generation_cost(user_id, match_id, content_type, prompt_tokens, complet
         db.commit()
     except Exception as e:
         db.rollback()
-        print(f"Error saving cost: {e}")
     finally:
         db.close()
 
@@ -906,31 +879,16 @@ CRITICAL RULES:
 WEB ARTICLE STRUCTURE:
 
 1. HEADLINE (Create a catchy, SEO-friendly headline)
-   - Use action words and the winning team's name
 
 2. LEAD PARAGRAPH (1-2 sentences)
-   - Summarize the match result immediately
-   - Include: Winner, loser, final score, venue
 
 3. KEY MOMENTS (Section heading)
-   - Write 3-4 short paragraphs about crucial moments
-   - Use subheadings for each moment
-   - Include specific scores and turning points
 
 4. PLAYER PERFORMANCES (Section heading)
-   - Highlight 2-3 standout players from OFFICIAL best players list
-   - If best players show "Not available", write: "Best players not available"
 
 5. THE STATS (Section heading)
-   Present key statistics in bullet points:
-   - Final Score: [Home] X defeated [Away] Y
-   - Margin: Z points
-   - Top Goal Scorers: [Use OFFICIAL list]
-   - Best Players: [Use OFFICIAL list OR "Best players not available"]
-   - Venue: [Venue name]
 
 6. WHAT IT MEANS (Section heading)
-   - 1-2 paragraphs on implications
 
 LENGTH: 500-650 words
 
@@ -948,37 +906,6 @@ CRITICAL RULES:
 2. If best players show "Not available", write exactly: "Best players not available"
 3. Use ONLY the exact goal scorers listed in the "GOAL SCORERS (OFFICIAL)" section
 4. Do NOT invent or guess any player names
-
-SOCIAL MEDIA LONG-FORM POST STRUCTURE:
-
-1. ATTENTION-GRABBING OPENING (2-3 sentences)
-   - Start with emoji and excitement
-   - Announce the result with energy
-
-2. THE STORY (3-4 short paragraphs)
-   - Tell the match narrative quarter by quarter
-   - Use emojis strategically (⚡ 🎯 💪 🏆)
-   - Keep sentences short and punchy
-
-3. THE HEROES (1-2 paragraphs)
-   - Highlight 2-3 best players from OFFICIAL list
-   - If best players show "Not available", write: "Best players not available"
-
-4. BY THE NUMBERS (Formatted list)
-   📊 THE NUMBERS:
-   ⚽ Final Score: [Home] X-Y [Away]
-   📍 Venue: [Venue]
-   ⭐ Margin: Z points
-   🎯 Top Goal Kickers:
-   • [Home team goals - use OFFICIAL list]
-   • [Away team goals - use OFFICIAL list]
-   💎 Best Players:
-   • [Home team - use OFFICIAL list OR "Best players not available"]
-   • [Away team - use OFFICIAL list OR "Best players not available"]
-
-5. CLOSING HOOK (1-2 sentences)
-   - End with forward-looking statement
-   - Include relevant hashtags (3-5)
 
 LENGTH: 350-500 words
 
