@@ -103,10 +103,11 @@ st.set_page_config(
 )
 
 # --------------------------------------------------
-# Custom CSS - FIXED COLORS
+# Custom CSS - FULLY FIXED
 # --------------------------------------------------
 st.markdown("""
 <style>
+    /* Main background */
     .stApp {
         background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #06b6d4 100%);
     }
@@ -117,6 +118,7 @@ st.markdown("""
         max-width: 1400px;
     }
     
+    /* Login card */
     .login-card {
         background: rgba(255, 255, 255, 0.98);
         padding: 3rem;
@@ -125,16 +127,22 @@ st.markdown("""
         backdrop-filter: blur(10px);
     }
     
+    .login-card h3,
+    .login-card p {
+        color: #1e293b !important;
+    }
+    
+    /* Metrics */
     div[data-testid="stMetricValue"] {
         font-size: 2rem;
         font-weight: 700;
-        color: #1e40af;
+        color: #1e40af !important;
     }
     
     div[data-testid="stMetricLabel"] {
         font-size: 0.95rem;
         font-weight: 600;
-        color: #64748b;
+        color: #64748b !important;
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
@@ -154,6 +162,7 @@ st.markdown("""
         border-color: #3b82f6;
     }
     
+    /* Headers */
     h1 {
         color: #ffffff !important;
         font-weight: 800 !important;
@@ -170,20 +179,9 @@ st.markdown("""
     }
     
     h3 {
-        color: #1e40af !important;
+        color: #ffffff !important;
         font-weight: 600 !important;
         margin-top: 1rem !important;
-    }
-    
-    /* Expander content text - FIXED */
-    div[data-testid="stExpander"] h3 {
-        color: #1e293b !important;
-    }
-    
-    div[data-testid="stExpander"] p,
-    div[data-testid="stExpander"] span,
-    div[data-testid="stExpander"] div {
-        color: #1e293b !important;
     }
     
     /* Sidebar */
@@ -199,7 +197,8 @@ st.markdown("""
     section[data-testid="stSidebar"] h2,
     section[data-testid="stSidebar"] h3,
     section[data-testid="stSidebar"] p,
-    section[data-testid="stSidebar"] label {
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] span {
         color: #ffffff !important;
     }
     
@@ -209,6 +208,7 @@ st.markdown("""
         border-radius: 10px;
         margin: 0.3rem 0;
         transition: all 0.3s ease;
+        color: #ffffff !important;
     }
     
     section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
@@ -216,9 +216,10 @@ st.markdown("""
         transform: translateX(5px);
     }
     
+    /* Buttons */
     .stButton > button {
         background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-        color: white;
+        color: white !important;
         border: none;
         padding: 0.75rem 2rem;
         border-radius: 12px;
@@ -234,21 +235,88 @@ st.markdown("""
         box-shadow: 0 6px 25px rgba(59, 130, 246, 0.4);
     }
     
-    .stTextInput > div > div > input,
-    .stSelectbox > div > div > div,
-    .stDateInput > div > div > input {
+    /* TEXT INPUT FIELDS - FIXED */
+    .stTextInput > div > div > input {
         border-radius: 10px;
-        border: 2px solid #e2e8f0;
+        border: 2px solid #cbd5e1;
         padding: 0.75rem;
         transition: all 0.3s ease;
-        color: #1e293b;
+        background-color: #ffffff !important;
+        color: #1e293b !important;
     }
     
-    .stTextInput > div > div > input:focus,
-    .stSelectbox > div > div > div:focus,
+    .stTextInput > div > div > input::placeholder {
+        color: #94a3b8 !important;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        background-color: #ffffff !important;
+        color: #1e293b !important;
+    }
+    
+    /* TEXT INPUT LABELS - FIXED */
+    .stTextInput > label {
+        color: #1e293b !important;
+        font-weight: 500;
+    }
+    
+    /* SELECT BOX - FIXED */
+    .stSelectbox > div > div {
+        background-color: #ffffff !important;
+        color: #1e293b !important;
+        border: 2px solid #cbd5e1;
+        border-radius: 10px;
+    }
+    
+    .stSelectbox > div > div:focus-within {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .stSelectbox > label {
+        color: #1e293b !important;
+        font-weight: 500;
+    }
+    
+    /* SELECT BOX OPTIONS - FIXED */
+    .stSelectbox option {
+        background-color: #ffffff !important;
+        color: #1e293b !important;
+    }
+    
+    /* DATE INPUT - FIXED */
+    .stDateInput > div > div > input {
+        border-radius: 10px;
+        border: 2px solid #cbd5e1;
+        padding: 0.75rem;
+        transition: all 0.3s ease;
+        background-color: #ffffff !important;
+        color: #1e293b !important;
+    }
+    
     .stDateInput > div > div > input:focus {
         border-color: #3b82f6;
         box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .stDateInput > label {
+        color: #1e293b !important;
+        font-weight: 500;
+    }
+    
+    /* NUMBER INPUT - FIXED */
+    .stNumberInput > div > div > input {
+        background-color: #ffffff !important;
+        color: #1e293b !important;
+        border: 2px solid #cbd5e1;
+        border-radius: 10px;
+    }
+    
+    .stNumberInput > label {
+        color: #1e293b !important;
+        font-weight: 500;
     }
     
     /* Expanders - FIXED */
@@ -265,14 +333,22 @@ st.markdown("""
         border-color: #3b82f6;
     }
     
-    /* Expander header - FIXED */
+    /* Expander header */
     div[data-testid="stExpander"] summary {
         color: #1e293b !important;
         font-weight: 600;
     }
     
-    /* Expander content - FIXED */
+    /* Expander content */
     div[data-testid="stExpander"] > div > div {
+        color: #1e293b !important;
+    }
+    
+    div[data-testid="stExpander"] h3,
+    div[data-testid="stExpander"] h4,
+    div[data-testid="stExpander"] p,
+    div[data-testid="stExpander"] span,
+    div[data-testid="stExpander"] strong {
         color: #1e293b !important;
     }
     
@@ -284,7 +360,6 @@ st.markdown("""
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     }
     
-    /* Table text - FIXED */
     div[data-testid="stDataFrame"] table {
         color: #1e293b !important;
     }
@@ -292,18 +367,21 @@ st.markdown("""
     div[data-testid="stDataFrame"] th {
         color: #1e293b !important;
         font-weight: 600;
+        background-color: #f8fafc !important;
     }
     
     div[data-testid="stDataFrame"] td {
         color: #1e293b !important;
     }
     
+    /* Dividers */
     hr {
         margin: 2rem 0;
         border: none;
         border-top: 2px solid rgba(255, 255, 255, 0.2);
     }
     
+    /* Alert boxes - FIXED */
     .stAlert {
         border-radius: 12px;
         border-left: 4px solid;
@@ -333,6 +411,7 @@ st.markdown("""
         color: #7f1d1d !important;
     }
     
+    /* Charts */
     div[data-testid="stArrowVegaLiteChart"] {
         background: white;
         border-radius: 12px;
@@ -340,9 +419,10 @@ st.markdown("""
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     }
     
+    /* Download button */
     .stDownloadButton > button {
         background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-        color: white;
+        color: white !important;
         border: none;
         padding: 0.75rem 2rem;
         border-radius: 12px;
@@ -355,19 +435,28 @@ st.markdown("""
         transform: translateY(-2px);
     }
     
+    /* Text area - FIXED */
     .stTextArea textarea {
         border-radius: 10px;
-        border: 2px solid #e2e8f0;
-        color: #1e293b;
+        border: 2px solid #cbd5e1;
+        background-color: #ffffff !important;
+        color: #1e293b !important;
     }
     
+    .stTextArea > label {
+        color: #1e293b !important;
+        font-weight: 500;
+    }
+    
+    /* Caption */
     .caption {
-        color: #64748b;
+        color: #64748b !important;
         font-size: 0.875rem;
         font-style: italic;
         margin-top: 0.5rem;
     }
     
+    /* Badge */
     .badge {
         display: inline-block;
         padding: 0.25rem 0.75rem;
@@ -375,9 +464,10 @@ st.markdown("""
         font-size: 0.875rem;
         font-weight: 600;
         background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-        color: white;
+        color: white !important;
     }
     
+    /* Cost highlight */
     .cost-highlight {
         background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
         padding: 0.5rem 1rem;
@@ -387,25 +477,32 @@ st.markdown("""
         color: #78350f !important;
     }
     
-    /* Markdown text in expanders - FIXED */
+    /* Markdown in expanders - FIXED */
     div[data-testid="stExpander"] .stMarkdown {
         color: #1e293b !important;
     }
     
     div[data-testid="stExpander"] .stMarkdown p,
     div[data-testid="stExpander"] .stMarkdown strong,
-    div[data-testid="stExpander"] .stMarkdown span {
+    div[data-testid="stExpander"] .stMarkdown span,
+    div[data-testid="stExpander"] .stMarkdown div {
         color: #1e293b !important;
     }
     
-    /* Number input - FIXED */
-    .stNumberInput input {
+    /* Form elements inside expanders - FIXED */
+    div[data-testid="stExpander"] .stTextInput > div > div > input {
+        background-color: #ffffff !important;
         color: #1e293b !important;
     }
     
-    /* Select box text - FIXED */
-    .stSelectbox > div > div {
+    div[data-testid="stExpander"] .stSelectbox > div > div {
+        background-color: #ffffff !important;
         color: #1e293b !important;
+    }
+    
+    /* Spinner text */
+    .stSpinner > div {
+        color: #ffffff !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -478,9 +575,9 @@ def logout():
     st.session_state.admin = None
     st.rerun()
 
-# --------------------------------------------------
-# Dashboard Pages
-# --------------------------------------------------
+# ... (Rest of the functions remain the same - show_statistics, show_analytics, etc.)
+# I'll continue with the rest in the next part to keep it organized
+
 def show_statistics():
     st.header("📊 System Overview")
     st.markdown("<br>", unsafe_allow_html=True)
