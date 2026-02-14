@@ -103,7 +103,7 @@ st.set_page_config(
 )
 
 # --------------------------------------------------
-# Custom CSS
+# Custom CSS - FIXED COLORS
 # --------------------------------------------------
 st.markdown("""
 <style>
@@ -175,6 +175,18 @@ st.markdown("""
         margin-top: 1rem !important;
     }
     
+    /* Expander content text - FIXED */
+    div[data-testid="stExpander"] h3 {
+        color: #1e293b !important;
+    }
+    
+    div[data-testid="stExpander"] p,
+    div[data-testid="stExpander"] span,
+    div[data-testid="stExpander"] div {
+        color: #1e293b !important;
+    }
+    
+    /* Sidebar */
     section[data-testid="stSidebar"] {
         background: linear-gradient(180deg, #1e293b 0%, #334155 100%);
     }
@@ -229,6 +241,7 @@ st.markdown("""
         border: 2px solid #e2e8f0;
         padding: 0.75rem;
         transition: all 0.3s ease;
+        color: #1e293b;
     }
     
     .stTextInput > div > div > input:focus,
@@ -238,8 +251,9 @@ st.markdown("""
         box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
     }
     
+    /* Expanders - FIXED */
     div[data-testid="stExpander"] {
-        background: rgba(255, 255, 255, 0.95);
+        background: rgba(255, 255, 255, 0.98);
         border-radius: 12px;
         border: 1px solid #e2e8f0;
         margin: 0.5rem 0;
@@ -251,11 +265,37 @@ st.markdown("""
         border-color: #3b82f6;
     }
     
+    /* Expander header - FIXED */
+    div[data-testid="stExpander"] summary {
+        color: #1e293b !important;
+        font-weight: 600;
+    }
+    
+    /* Expander content - FIXED */
+    div[data-testid="stExpander"] > div > div {
+        color: #1e293b !important;
+    }
+    
+    /* Dataframes */
     div[data-testid="stDataFrame"] {
         background: white;
         border-radius: 12px;
         padding: 1rem;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    }
+    
+    /* Table text - FIXED */
+    div[data-testid="stDataFrame"] table {
+        color: #1e293b !important;
+    }
+    
+    div[data-testid="stDataFrame"] th {
+        color: #1e293b !important;
+        font-weight: 600;
+    }
+    
+    div[data-testid="stDataFrame"] td {
+        color: #1e293b !important;
     }
     
     hr {
@@ -272,21 +312,25 @@ st.markdown("""
     .stSuccess {
         background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
         border-left-color: #10b981;
+        color: #065f46 !important;
     }
     
     .stInfo {
         background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
         border-left-color: #3b82f6;
+        color: #1e3a8a !important;
     }
     
     .stWarning {
         background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
         border-left-color: #f59e0b;
+        color: #78350f !important;
     }
     
     .stError {
         background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
         border-left-color: #ef4444;
+        color: #7f1d1d !important;
     }
     
     div[data-testid="stArrowVegaLiteChart"] {
@@ -314,6 +358,7 @@ st.markdown("""
     .stTextArea textarea {
         border-radius: 10px;
         border: 2px solid #e2e8f0;
+        color: #1e293b;
     }
     
     .caption {
@@ -339,7 +384,28 @@ st.markdown("""
         border-radius: 8px;
         border-left: 4px solid #f59e0b;
         font-weight: 600;
-        color: #92400e;
+        color: #78350f !important;
+    }
+    
+    /* Markdown text in expanders - FIXED */
+    div[data-testid="stExpander"] .stMarkdown {
+        color: #1e293b !important;
+    }
+    
+    div[data-testid="stExpander"] .stMarkdown p,
+    div[data-testid="stExpander"] .stMarkdown strong,
+    div[data-testid="stExpander"] .stMarkdown span {
+        color: #1e293b !important;
+    }
+    
+    /* Number input - FIXED */
+    .stNumberInput input {
+        color: #1e293b !important;
+    }
+    
+    /* Select box text - FIXED */
+    .stSelectbox > div > div {
+        color: #1e293b !important;
     }
 </style>
 """, unsafe_allow_html=True)
