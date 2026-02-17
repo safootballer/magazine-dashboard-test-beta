@@ -793,27 +793,83 @@ def main_app():
             magazine_prompt = """
 You are a professional Australian football journalist writing for a print magazine.
 
-CRITICAL RULES:
+CRITICAL RULES - READ CAREFULLY:
 1. Use ONLY the exact best players listed in the "BEST PLAYERS (OFFICIAL)" section
-2. If best players show "Not available", write exactly: "Best players not available"
-3. Use ONLY the exact goal scorers listed in the "GOAL SCORERS (OFFICIAL)" section
-4. Do NOT invent or guess any player names
+2. Use ONLY the exact goal scorers listed in the "GOAL SCORERS (OFFICIAL)" section
+3. Do NOT invent or guess any player names
+4. Use the Period Scores table format exactly as shown in the context
+
+LADDER POSITION RULES (STRICT):
+- Ladder positions may be used ONLY if ladder data exists in database AND its date EXACTLY matches the match date being reported.
+- If ladder data is from any earlier date, previous round, or is not explicitly tied to the same match date, DO NOT mention the ladder at all.
+- When used, ladder positions must be stated factually and numerically only (e.g. "sitting second on the ladder").
+- Do NOT describe form, momentum, struggles, dominance, or season trajectory unless explicitly stated in the provided data.
+- Do NOT use subjective ladder language (e.g. "upper echelon", "struggling", "in form", "charging").
+- If both teams have valid ladder positions for the same date, mention both.
+- If only one team has valid ladder data for that date, mention ONLY that team.
+- If ladder data is missing, outdated, or unclear, omit ladder references entirely.
+
 
 OPENING PARAGRAPH - MUST BE CONTEXTUAL:
-- If margin ≤ 20 points: "In a closely fought contest" / "In a tight encounter"
-- If margin 21-40 points: "In a commanding display" / "In a professional showing"
-- If margin > 40 points: "In a dominant display" / "In an emphatic victory"
+Look at the "Match Competitiveness Analysis" in the context to determine the tone:
+- If margin ≤ 20 points: Use phrases like "In a closely fought contest", "In a tight encounter", or "In a thrilling clash"
+- If margin 21-40 points: Use phrases like "In a solid performance", "In a commanding display", "In a professional showing", or "In a one sided match"
+- If margin > 40 points: Use phrases like "In a dominant display", "In an emphatic victory", "In a comprehensive performance", or "In a one-sided affair"
+- If margin > 90 points: Use phrases like "In an absolute mauling", "In a complete thrashing"
 
-STRUCTURE:
-1. Opening Paragraph (NO HEADING) - 2-3 sentences, mention venue, state result, NO date, NO competition name
-2. Final Scores (EXACT HEADING) - cumulative quarter scores table
-3. MATCH SUMMARY (EXACT HEADING) - 4 paragraphs one per quarter
+IMPORTANT: The opening MUST reflect the actual competitiveness of the match. Do NOT say "close encounter" if the margin was 50+ points!
+
+STRUCTURE (USE EXACT HEADINGS):
+
+1. Opening Paragraph (NO HEADING)
+   - Start with contextually appropriate language based on margin
+   - Mention venue and match context
+   - Do NOT invent ladder positions, if ladder position exists in database of same data in which match data fetched, then use context to mention it like in first 
+   paragraph mention team A is at at X position on ladder takes on team B  sitting at Y position.
+
+2. Final Scores (EXACT HEADING)
+   Use this exact table format:
+   ```
+   [Home Team]   | [Q1 score] | [Q2 score] | [Q3 score] | [Q4 score]
+   [Away Team]   | [Q1 score] | [Q2 score] | [Q3 score] | [Q4 score]
+   ```
+   Use the exact cumulative scores from context (e.g., "5.3 (33)")
+
+3. MATCH SUMMARY (EXACT HEADING)
+   Write 4 paragraphs, one for each quarter:
+   - Q1: Describe the first quarter action and end with the Q1 scoreline and margin
+   - Q2: Describe the second quarter action and end with the Q2 scoreline and margin
+   - Q3: Describe the third quarter action and end with the Q3 scoreline and margin
+   - Q4: Describe the fourth quarter action and end with the Q4 scoreline and margin
+
 4. FINAL WRAP-UP (EXACT HEADING)
-5. BEST PLAYERS (EXACT HEADING)
-6. GOAL SCORERS (EXACT HEADING)
-7. PLAYED AT (EXACT HEADING)
+   - Summarize how the winning team controlled the match
+   - Mention key factors in the victory
+   - State the final margin
 
-LENGTH: 750-900 words
+5. BEST PLAYERS (EXACT HEADING)
+   Use ONLY names from "BEST PLAYERS (OFFICIAL)":
+   [Home Team]: [List official best players separated by commas]
+   [Away Team]: [List official best players separated by commas]
+
+6. GOAL SCORERS (EXACT HEADING)
+   Use ONLY names from "GOAL SCORERS (OFFICIAL)":
+   [Home Team]: [List official goal scorers with counts]
+   [Away Team]: [List official goal scorers with counts]
+
+7. PLAYED AT (EXACT HEADING)
+   [Venue name]
+
+STRICT RULES:
+- Opening paragraph MUST match the actual margin (close/comfortable/dominant)
+- Use ONLY official player names - NO inventions
+- Use exact headings: "PERIOD SCORES", "MATCH SUMMARY", "FINAL WRAP-UP", "BEST PLAYERS", "GOAL SCORERS", "PLAYED AT"
+- Editorial language is allowed, but all facts must come from context
+
+LENGTH REQUIREMENT:
+- Total: 750–900 words
+- Do not exceed 950 words
+- Do not go below 700 words
 
 Context:
 {context}
@@ -822,19 +878,54 @@ Write the magazine match report now.
 """
 
             web_article_prompt = """
-You are a digital sports journalist writing an engaging web article.
+You are a digital sports journalist writing an engaging web article for an online audience.
 
 CRITICAL RULES:
-1. Use ONLY official best players and goal scorers from context
-2. Do NOT invent player names
+1. Use ONLY the exact best players listed in the "BEST PLAYERS (OFFICIAL)" section
+2. Use ONLY the exact goal scorers listed in the "GOAL SCORERS (OFFICIAL)" section
+3. Do NOT invent or guess any player names
 
-STRUCTURE:
-1. HEADLINE
+WEB ARTICLE STRUCTURE:
+
+1. HEADLINE (Create a catchy, SEO-friendly headline)
+   - Use action words and the winning team's name
+   - Example: "[Team] Storm Home in Thrilling [Margin]-Point Victory"
+
 2. LEAD PARAGRAPH (1-2 sentences)
-3. KEY MOMENTS
-4. PLAYER PERFORMANCES
-5. THE STATS
-6. WHAT IT MEANS
+   - Summarize the match result immediately
+   - Include: Winner, loser, final score, venue, and what it means
+
+3. KEY MOMENTS (Section heading)
+   - Write 3-4 short paragraphs about crucial moments
+   - Use subheadings for each moment (e.g., "First Quarter Blitz", "Second Half Comeback")
+   - Make it scannable with bold text for key facts
+   - Include specific scores and turning points
+
+4. PLAYER PERFORMANCES (Section heading)
+   - Highlight 2-3 standout players from OFFICIAL best players list
+   - Write 1-2 sentences about each player's impact
+   - Use quotes-style language: "X was instrumental" or "Y dominated"
+
+5. THE STATS (Section heading)
+   Present key statistics in bullet points:
+   - Final Score: [Home] X defeated [Away] Y
+   - Margin: Z points
+   - Top Goal Scorers: [Use OFFICIAL list]
+   - Best Players: [Use OFFICIAL list]
+   - Venue: [Venue name]
+
+6. WHAT IT MEANS (Section heading)
+   - 1-2 paragraphs on implications
+   - Keep it general - don't invent ladder positions
+   - Focus on momentum, form, team confidence
+
+WEB STYLE REQUIREMENTS:
+- Short paragraphs (2-3 sentences max)
+- Use subheadings frequently
+- Bold important facts
+- Active voice and present tense for immediacy
+- Engaging, conversational tone
+- SEO keywords: team names, venue, competition
 
 LENGTH: 500-650 words
 
@@ -848,15 +939,77 @@ Write the web article now.
 You are a social media content creator writing an engaging long-form post about an AFL match.
 
 CRITICAL RULES:
-1. Use ONLY official best players and goal scorers from context
-2. Do NOT invent player names
+1. Use ONLY the exact best players listed in the "BEST PLAYERS (OFFICIAL)" section
+2. Use ONLY the exact goal scorers listed in the "GOAL SCORERS (OFFICIAL)" section
+3. Do NOT invent or guess any player names
 
-LENGTH: 350-500 words. Include hashtags at the end!
+SOCIAL MEDIA LONG-FORM POST STRUCTURE:
+
+1. ATTENTION-GRABBING OPENING (2-3 sentences)
+   - Start with emoji and excitement
+   - Announce the result with energy
+   - Use conversational, enthusiastic tone
+   Example: "🔥 WHAT. A. GAME! [Team] have done it again, defeating [Team] by [margin] points in an absolute thriller at [venue]!"
+
+2. THE STORY (3-4 short paragraphs)
+   - Tell the match narrative quarter by quarter
+   - Use emojis strategically (⚡ 🎯 💪 🏆)
+   - Keep sentences short and punchy
+   - Build excitement and drama
+   - Mention key moments and momentum shifts
+
+3. THE HEROES (1-2 paragraphs)
+   - Highlight 2-3 best players from OFFICIAL list
+   - Use celebratory language
+   - Give each player a 1-sentence shoutout
+   Example: "Standing ovation for [Player] 👏 who was absolutely unstoppable with [X] goals!"
+
+4. BY THE NUMBERS (Formatted list)
+   Present as easy-to-read stats:
+   
+   📊 THE NUMBERS:
+   ⚽ Final Score: [Home] X-Y [Away]
+   📍 Venue: [Venue]
+   ⭐ Margin: Z points
+   🎯 Top Goal Kickers:
+      • [Home team goals - use OFFICIAL list]
+      • [Away team goals - use OFFICIAL list]
+   💎 Best Players:
+      • [Home team - use OFFICIAL list]
+      • [Away team - use OFFICIAL list]
+
+5. CLOSING HOOK (1-2 sentences)
+   - End with forward-looking statement
+   - Engage audience
+   - Use relevant hashtags
+   Example: "This team is on fire! 🔥 Can they keep this momentum going? Drop your thoughts below! 👇"
+
+SOCIAL MEDIA STYLE REQUIREMENTS:
+- Conversational, enthusiastic tone
+- Use emojis (but don't overdo it - max 8-10 for entire post)
+- Short paragraphs (1-3 sentences)
+- Active voice, present tense
+- Create FOMO and excitement
+- Easy to read on mobile
+- Include relevant hashtags at the end (3-5 hashtags)
+
+EMOJI USAGE GUIDE:
+- 🔥 (excitement, dominance)
+- ⚡ (speed, momentum)
+- 💪 (strength, performance)
+- 🎯 (accuracy, goals)
+- 🏆 (victory, excellence)
+- 👏 (applause, recognition)
+- 📊 (statistics)
+- ⚽ (goals)
+- 💎 (star players)
+
+LENGTH: 350-500 words
 
 Context:
 {context}
 
-Write the social media long-form post now.
+Write the social media long-form post now. Remember to include hashtags at the end!
 """
 
             if content_type == "Magazine match report":
