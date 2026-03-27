@@ -336,6 +336,7 @@ def login_page():
     with col3:
         st.markdown("""<div class="feature-card"><h2>✍️</h2><h4>Professional</h4><p>Magazine-quality content</p></div>""", unsafe_allow_html=True)
 
+
 def logout():
     st.session_state.logged_in = False
     st.session_state.user = None
@@ -424,6 +425,7 @@ def extract_period_scores(periods):
         formatted[q] = f"{cg}.{cb} ({cs})"
     return formatted
 
+
 def extract_lineup(players):
     lineup = []
     for p in players:
@@ -431,6 +433,7 @@ def extract_lineup(players):
         if profile:
             lineup.append(f"#{p['playerNumber']} {profile['firstName']} {profile['lastName']}")
     return lineup
+
 
 def extract_goal_scorers(players):
     scorers = []
@@ -448,6 +451,7 @@ def extract_goal_scorers(players):
     scorers.sort(key=lambda x: x["goals"], reverse=True)
     return [f"{s['name']} ({s['goals']})" for s in scorers]
 
+
 def extract_best_players(best_players_data):
     if not best_players_data:
         return []
@@ -463,6 +467,7 @@ def extract_best_players(best_players_data):
     except:
         return []
     return best
+
 
 def save_match_to_db(match):
     db = get_db()
@@ -491,6 +496,7 @@ def save_match_to_db(match):
         db.rollback()
     finally:
         db.close()
+
 
 def fetch_match_from_playhq(match_id: str) -> dict:
     payload = {"operationName": "gameView", "variables": {"gameId": match_id}, "query": GRAPHQL_QUERY}
@@ -525,6 +531,7 @@ def fetch_match_from_playhq(match_id: str) -> dict:
     }
     save_match_to_db(match)
     return match
+
 
 def build_match_knowledge(match: dict) -> str:
     home = match["home_team"]
@@ -570,6 +577,7 @@ BEST PLAYERS (OFFICIAL):
 {away}: {away_best_text}
 """.strip()
 
+
 def calculate_openai_cost(prompt_tokens, completion_tokens, model="gpt-4o-mini"):
     pricing = {
         "gpt-4o-mini": {"input": 0.150 / 1_000_000, "output": 0.600 / 1_000_000},
@@ -577,6 +585,7 @@ def calculate_openai_cost(prompt_tokens, completion_tokens, model="gpt-4o-mini")
     }
     p = pricing.get(model, pricing["gpt-4o-mini"])
     return prompt_tokens * p["input"] + completion_tokens * p["output"]
+
 
 def save_generation_cost(user_id, match_id, content_type, prompt_tokens, completion_tokens, total_tokens, cost_usd, model):
     db = get_db()
@@ -594,11 +603,10 @@ def save_generation_cost(user_id, match_id, content_type, prompt_tokens, complet
     finally:
         db.close()
 
+
 # --------------------------------------------------
 # Sanity Publisher
 # --------------------------------------------------
-
-# Competition name → Sanity schema value mapping
 COMPETITION_MAP = {
     "AFL": "AFL",
     "AFLW": "AFLW",
@@ -637,6 +645,7 @@ COUNTRY_LEAGUES = {
     "Yorke Peninsula": "yorke-peninsula",
 }
 
+
 def slugify(text):
     text = text.lower().strip()
     text = re.sub(r'[^\w\s-]', '', text)
@@ -644,10 +653,9 @@ def slugify(text):
     text = re.sub(r'^-+|-+$', '', text)
     return text[:96]
 
+
 def text_to_portable_text(text):
-    """Convert plain text to Sanity Portable Text block array."""
     paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
-    # Fall back to single newlines if no double newlines found
     if len(paragraphs) <= 1:
         paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
     blocks = []
@@ -666,21 +674,16 @@ def text_to_portable_text(text):
         })
     return blocks
 
+
 def extract_excerpt_from_content(content_text, content_type):
-    """Auto-extract a short excerpt from the generated content."""
     lines = [l.strip() for l in content_text.split('\n') if l.strip()]
-    # Skip headings and short lines, grab first real paragraph
     for line in lines:
         if len(line) > 80 and not line.startswith('#') and not line.startswith('**') and not line.startswith('|'):
             return line[:300]
     return lines[0][:300] if lines else ""
 
+
 def publish_to_sanity(title, slug, competition, excerpt, content_text, author, country_league=None, as_draft=False):
-    """
-    Publish or save as draft to Sanity.
-    No drafts. prefix = live on website immediately.
-    drafts. prefix = saved in Sanity Studio as draft only.
-    """
     project_id = os.getenv("SANITY_PROJECT_ID") or st.secrets.get("SANITY_PROJECT_ID", "")
     dataset    = os.getenv("SANITY_DATASET", "production") or st.secrets.get("SANITY_DATASET", "production")
     token      = os.getenv("SANITY_TOKEN") or st.secrets.get("SANITY_TOKEN", "")
@@ -717,6 +720,7 @@ def publish_to_sanity(title, slug, competition, excerpt, content_text, author, c
             return False, f"Sanity returned status {resp.status_code}: {resp.text}"
     except Exception as e:
         return False, str(e)
+
 
 # --------------------------------------------------
 # Main App
@@ -890,7 +894,6 @@ def main_app():
                 ]
                 st.session_state.vectordb = InMemoryVectorStore.from_documents(chunks, OpenAIEmbeddings())
                 st.session_state.selected_match_labels = selected_labels
-                # Store the first match's competition for Sanity publishing
                 first_match = match_map[selected_labels[0]]
                 st.session_state.current_competition = first_match.competition or "AFL"
                 st.success(f"🎉 Knowledge base ready! {len(docs)} match(es), {len(chunks)} chunks indexed.")
@@ -904,18 +907,30 @@ def main_app():
         st.markdown("## ✍️ Step 3: Generate Content")
         st.markdown("<br>", unsafe_allow_html=True)
 
+        if "content_type_selection" not in st.session_state:
+            st.session_state.content_type_selection = "Magazine match report"
+
         col1, col2 = st.columns([2, 1])
         with col1:
             content_type = st.selectbox(
                 "📝 Content Type",
                 ["Magazine match report", "Web article", "Social media long-form post"],
-                index=0
+                index=["Magazine match report", "Web article", "Social media long-form post"].index(
+                    st.session_state.content_type_selection
+                ),
+                key="content_type_select"
             )
+            st.session_state.content_type_selection = content_type
+
         with col2:
             st.markdown("&nbsp;", unsafe_allow_html=True)
             generate_button = st.button("🧠 Generate Content", use_container_width=True, type="primary")
 
         if generate_button:
+            for k in ["publish_success", "published_slug", "generated_content", "generated_content_type"]:
+                if k in st.session_state:
+                    del st.session_state[k]
+
             model_name = "gpt-4o-mini"
             llm = ChatOpenAI(model=model_name, temperature=0.25, max_tokens=1200)
             retriever = st.session_state.vectordb.as_retriever(k=6)
@@ -941,7 +956,7 @@ LADDER POSITION RULES (STRICT):
 
 OPENING PARAGRAPH - MUST BE CONTEXTUAL:
 Look at the "Match Competitiveness Analysis" in the context to determine the tone:
-- If margin ≤ 20 points: Use phrases like "In a closely fought contest", "In a tight encounter", or "In a thrilling clash"
+- If margin <= 20 points: Use phrases like "In a closely fought contest", "In a tight encounter", or "In a thrilling clash"
 - If margin 21-40 points: Use phrases like "In a solid performance", "In a commanding display", "In a professional showing", or "In a one sided match"
 - If margin > 40 points: Use phrases like "In a dominant display", "In an emphatic victory", "In a comprehensive performance", or "In a one-sided affair"
 - If margin > 90 points: Use phrases like "In an absolute mauling", "In a complete thrashing"
@@ -953,17 +968,15 @@ STRUCTURE (USE EXACT HEADINGS):
 1. Opening Paragraph (NO HEADING)
 2. Final Scores (EXACT HEADING)
    Use this exact table format:
-   ```
    [Home Team]   | [Q1 score] | [Q2 score] | [Q3 score] | [Q4 score]
    [Away Team]   | [Q1 score] | [Q2 score] | [Q3 score] | [Q4 score]
-   ```
 3. MATCH SUMMARY (EXACT HEADING) - 4 paragraphs, one per quarter
 4. FINAL WRAP-UP (EXACT HEADING)
 5. BEST PLAYERS (EXACT HEADING)
 6. GOAL SCORERS (EXACT HEADING)
 7. PLAYED AT (EXACT HEADING)
 
-LENGTH REQUIREMENT: 750–900 words
+LENGTH REQUIREMENT: 750-900 words
 
 Context:
 {context}
@@ -1064,16 +1077,14 @@ Write the social media long-form post now.
                         model=model_name
                     )
 
-            # Store generated content in session state for Step 4
             st.session_state.generated_content = result
             st.session_state.generated_content_type = content_type
-            if "publish_success" in st.session_state:
-                del st.session_state["publish_success"]
+            st.rerun()
 
-        # Show generated content if it exists
+        # Show generated content
         if "generated_content" in st.session_state:
             result = st.session_state.generated_content
-            content_type = st.session_state.get("generated_content_type", "")
+            saved_content_type = st.session_state.get("generated_content_type", "")
 
             st.markdown("## 📄 Generated Content")
             st.markdown('<div class="content-card">', unsafe_allow_html=True)
@@ -1086,162 +1097,158 @@ Write the social media long-form post now.
             with col2:
                 st.metric("📝 Characters", len(result))
             with col3:
-                st.metric("📄 Type", content_type.split()[0] if content_type else "")
+                st.metric("📄 Type", saved_content_type.split()[0] if saved_content_type else "")
 
             st.text_area("📋 Copy Text", result, height=300)
+            st.success("✅ Content generated successfully!")
 
-        # --------------------------------------------------
-        # Step 4: Publish to Website
-        # --------------------------------------------------
-        if "generated_content" in st.session_state:
-            st.divider()
-            st.markdown("## 🚀 Step 4: Publish to SA Footballer Website")
+    # --------------------------------------------------
+    # Step 4: Publish to Website
+    # Outside the vectordb block so it always renders
+    # --------------------------------------------------
+    if "generated_content" in st.session_state:
+        st.divider()
+        st.markdown("## 🚀 Step 4: Publish to SA Footballer Website")
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        if st.session_state.get("publish_success"):
+            published_slug = st.session_state.get("published_slug", "")
+            st.success("🎉 **Article is LIVE on your website!**")
+            st.info(f"🔗 View it at: `https://sa-footballer-website.vercel.app/editorials/{published_slug}`")
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # Show success banner if already published
-            if st.session_state.get("publish_success"):
-                published_slug = st.session_state.get("published_slug", "")
-                st.success("🎉 **Article is LIVE on your website!**")
-                st.info(f"🔗 View it at: `https://sa-footballer-website.vercel.app/editorials/{published_slug}`")
-                st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style='background: rgba(255,255,255,0.12); padding: 1.5rem; border-radius: 12px;
+                    border: 1px solid rgba(255,255,255,0.25); margin-bottom: 1rem;'>
+            <p style='color: white; margin: 0; font-size: 0.95rem;'>
+                Fill in the details below and hit <strong>Publish Live</strong> —
+                your article will appear on the Editorials page immediately. No Sanity Studio needed.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
-            st.markdown("""
-            <div style='background: rgba(255,255,255,0.12); padding: 1.5rem; border-radius: 12px;
-                        border: 1px solid rgba(255,255,255,0.25); margin-bottom: 1rem;'>
-                <p style='color: white; margin: 0; font-size: 0.95rem;'>
-                    ✅ Fill in the details below and hit <strong>Publish Live</strong> — 
-                    your article will appear on the Editorials page immediately. No Sanity Studio needed.
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
+        col1, col2 = st.columns([3, 2])
 
-            col1, col2 = st.columns([3, 2])
+        with col1:
+            first_line = st.session_state.generated_content.split('\n')[0].strip()
+            first_line = re.sub(r'^#+\s*', '', first_line)
+            first_line = re.sub(r'\*+', '', first_line)
 
-            with col1:
-                # Auto-suggest title from first line of generated content
-                first_line = st.session_state.generated_content.split('\n')[0].strip()
-                first_line = re.sub(r'^#+\s*', '', first_line)  # strip markdown headings
-                first_line = re.sub(r'\*+', '', first_line)      # strip bold markers
+            pub_title = st.text_input(
+                "Article Title *",
+                value=first_line[:120] if len(first_line) > 10 else "",
+                placeholder="e.g. Glenelg Dominate in 45-Point Victory Over Sturt",
+                key="pub_title"
+            )
 
-                pub_title = st.text_input(
-                    "Article Title *",
-                    value=first_line[:120] if len(first_line) > 10 else "",
-                    placeholder="e.g. Glenelg Dominate in 45-Point Victory Over Sturt",
-                    key="pub_title"
+            auto_slug = slugify(pub_title) if pub_title else ""
+            pub_slug = st.text_input(
+                "Slug (URL path) *",
+                value=auto_slug,
+                help="Auto-generated from title. This becomes the article URL.",
+                key="pub_slug"
+            )
+
+            auto_excerpt = extract_excerpt_from_content(
+                st.session_state.generated_content,
+                st.session_state.get("generated_content_type", "")
+            )
+            pub_excerpt = st.text_area(
+                "Excerpt * (shown on editorial cards)",
+                value=auto_excerpt[:300],
+                height=100,
+                key="pub_excerpt"
+            )
+
+            pub_author = st.text_input(
+                "Author",
+                value=st.session_state.user['username'],
+                key="pub_author"
+            )
+
+        with col2:
+            competition_options = ["AFL", "AFLW", "SANFL", "SANFLW", "Amateur", "SAWFL Women's", "Country Football"]
+            raw_comp = st.session_state.get("current_competition", "AFL")
+            mapped_comp = COMPETITION_MAP.get(raw_comp, "AFL")
+            default_idx = competition_options.index(mapped_comp) if mapped_comp in competition_options else 0
+
+            pub_competition = st.selectbox(
+                "Competition *",
+                competition_options,
+                index=default_idx,
+                key="pub_competition"
+            )
+
+            pub_country_league = None
+            if pub_competition == "Country Football":
+                league_name = st.selectbox(
+                    "Country League *",
+                    list(COUNTRY_LEAGUES.keys()),
+                    key="pub_league"
                 )
+                pub_country_league = COUNTRY_LEAGUES[league_name]
 
-                auto_slug = slugify(pub_title) if pub_title else ""
-                pub_slug = st.text_input(
-                    "Slug (URL path) *",
-                    value=auto_slug,
-                    help="Auto-generated. Edit if needed. This becomes the article URL.",
-                    key="pub_slug"
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            ready = bool(pub_title and pub_slug and pub_excerpt)
+            if not ready:
+                st.warning("⚠️ Fill in Title, Slug and Excerpt to enable publishing.")
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            publish_live = st.button(
+                "🚀 Publish Live Now",
+                type="primary",
+                use_container_width=True,
+                disabled=not ready,
+                key="publish_live_btn"
+            )
+
+            save_draft = st.button(
+                "💾 Save as Draft",
+                use_container_width=True,
+                disabled=not bool(pub_title),
+                key="save_draft_btn",
+                help="Saves to Sanity Studio only — won't appear on website until published from Studio."
+            )
+
+        if publish_live:
+            with st.spinner("📡 Publishing to SA Footballer website..."):
+                success, result_msg = publish_to_sanity(
+                    title=pub_title,
+                    slug=pub_slug,
+                    competition=pub_competition,
+                    excerpt=pub_excerpt,
+                    content_text=st.session_state.generated_content,
+                    author=pub_author,
+                    country_league=pub_country_league,
+                    as_draft=False
                 )
+            if success:
+                st.session_state.publish_success = True
+                st.session_state.published_slug = result_msg
+                st.balloons()
+                st.rerun()
+            else:
+                st.error(f"❌ Publish failed: {result_msg}")
 
-                # Auto-extract excerpt
-                auto_excerpt = extract_excerpt_from_content(
-                    st.session_state.generated_content,
-                    st.session_state.get("generated_content_type", "")
+        if save_draft:
+            with st.spinner("💾 Saving draft to Sanity..."):
+                success, result_msg = publish_to_sanity(
+                    title=pub_title,
+                    slug=pub_slug,
+                    competition=pub_competition,
+                    excerpt=pub_excerpt,
+                    content_text=st.session_state.generated_content,
+                    author=pub_author,
+                    country_league=pub_country_league,
+                    as_draft=True
                 )
-                pub_excerpt = st.text_area(
-                    "Excerpt * (shown on editorial cards)",
-                    value=auto_excerpt[:300],
-                    height=100,
-                    key="pub_excerpt"
-                )
+            if success:
+                st.success("💾 Draft saved in Sanity Studio. Go to Studio to review and publish.")
+            else:
+                st.error(f"❌ Draft save failed: {result_msg}")
 
-                pub_author = st.text_input(
-                    "Author",
-                    value=st.session_state.user['username'],
-                    key="pub_author"
-                )
-
-            with col2:
-                st.markdown("**Competition \***")
-
-                # Try to auto-detect competition from match data
-                raw_comp = st.session_state.get("current_competition", "AFL")
-                mapped_comp = COMPETITION_MAP.get(raw_comp, "AFL")
-
-                competition_options = ["AFL", "AFLW", "SANFL", "SANFLW", "Amateur", "SAWFL Women's", "Country Football"]
-                default_idx = competition_options.index(mapped_comp) if mapped_comp in competition_options else 0
-
-                pub_competition = st.selectbox(
-                    "Competition",
-                    competition_options,
-                    index=default_idx,
-                    label_visibility="collapsed",
-                    key="pub_competition"
-                )
-
-                pub_country_league = None
-                if pub_competition == "Country Football":
-                    league_name = st.selectbox("Country League *", list(COUNTRY_LEAGUES.keys()), key="pub_league")
-                    pub_country_league = COUNTRY_LEAGUES[league_name]
-
-                st.markdown("<br>", unsafe_allow_html=True)
-
-                # Validation
-                ready = bool(pub_title and pub_slug and pub_excerpt)
-                if not ready:
-                    st.warning("⚠️ Fill in Title, Slug, and Excerpt to publish.")
-
-                st.markdown("<br>", unsafe_allow_html=True)
-
-                publish_live = st.button(
-                    "🚀 Publish Live Now",
-                    type="primary",
-                    use_container_width=True,
-                    disabled=not ready,
-                    key="publish_live_btn"
-                )
-
-                save_draft = st.button(
-                    "💾 Save as Draft",
-                    use_container_width=True,
-                    disabled=not bool(pub_title),
-                    key="save_draft_btn",
-                    help="Saves to Sanity Studio as draft — won't appear on website until you publish from Studio."
-                )
-
-            # Handle publish
-            if publish_live:
-                with st.spinner("📡 Publishing to SA Footballer website..."):
-                    success, result_msg = publish_to_sanity(
-                        title=pub_title,
-                        slug=pub_slug,
-                        competition=pub_competition,
-                        excerpt=pub_excerpt,
-                        content_text=st.session_state.generated_content,
-                        author=pub_author,
-                        country_league=pub_country_league,
-                        as_draft=False
-                    )
-                if success:
-                    st.session_state.publish_success = True
-                    st.session_state.published_slug = result_msg
-                    st.balloons()
-                    st.rerun()
-                else:
-                    st.error(f"❌ Publish failed: {result_msg}")
-
-            # Handle draft
-            if save_draft:
-                with st.spinner("💾 Saving draft to Sanity..."):
-                    success, result_msg = publish_to_sanity(
-                        title=pub_title,
-                        slug=pub_slug,
-                        competition=pub_competition,
-                        excerpt=pub_excerpt,
-                        content_text=st.session_state.generated_content,
-                        author=pub_author,
-                        country_league=pub_country_league,
-                        as_draft=True
-                    )
-                if success:
-                    st.success("💾 Draft saved in Sanity Studio. Go to Studio to review and publish.")
-                else:
-                    st.error(f"❌ Draft save failed: {result_msg}")
 
 # --------------------------------------------------
 # Run
