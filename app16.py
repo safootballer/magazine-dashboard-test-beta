@@ -546,7 +546,7 @@ def build_match_knowledge(match: dict) -> str:
     home_best_text = "Not available" if match["best_players"]["home"] is None else (", ".join(match["best_players"]["home"]) or "None")
     away_best_text = "Not available" if match["best_players"]["away"] is None else (", ".join(match["best_players"]["away"]) or "None")
     return f"""
-{home} played {away} in an Adelaide Footy League match.
+{home} played {away} in a {match['competition']} match.
 The match took place on {match['date']} at {match['venue']} as part of the {match['competition']} season.
 
 PERIOD SCORES (Cumulative Goals.Behinds):
