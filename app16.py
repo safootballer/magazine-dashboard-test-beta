@@ -111,11 +111,11 @@ def run_migrations():
             if 'matches' in existing_tables:
                 existing_cols = [c['name'] for c in inspector.get_columns('matches')]
                 patches = {
-                    'best_players':  'ALTER TABLE matches ADD COLUMN best_players TEXT',
-                    'margin':        'ALTER TABLE matches ADD COLUMN margin INTEGER',
-                    'lineups':       'ALTER TABLE matches ADD COLUMN lineups TEXT',
-                    'goal_scorers':  'ALTER TABLE matches ADD COLUMN goal_scorers TEXT',
-                    'quarter_scores':'ALTER TABLE matches ADD COLUMN quarter_scores TEXT',
+                    'best_players':   'ALTER TABLE matches ADD COLUMN best_players TEXT',
+                    'margin':         'ALTER TABLE matches ADD COLUMN margin INTEGER',
+                    'lineups':        'ALTER TABLE matches ADD COLUMN lineups TEXT',
+                    'goal_scorers':   'ALTER TABLE matches ADD COLUMN goal_scorers TEXT',
+                    'quarter_scores': 'ALTER TABLE matches ADD COLUMN quarter_scores TEXT',
                 }
                 for col, sql in patches.items():
                     if col not in existing_cols:
@@ -541,13 +541,14 @@ def build_match_knowledge(match: dict) -> str:
     margin = abs(fs_home - fs_away)
     hq = match["period_scores"]["home"]
     aq = match["period_scores"]["away"]
+    competition = match["competition"]  # ← use actual competition name
     home_scorers_text = ", ".join(match["goal_scorers"]["home"]) if match["goal_scorers"]["home"] else "None"
     away_scorers_text = ", ".join(match["goal_scorers"]["away"]) if match["goal_scorers"]["away"] else "None"
     home_best_text = "Not available" if match["best_players"]["home"] is None else (", ".join(match["best_players"]["home"]) or "None")
     away_best_text = "Not available" if match["best_players"]["away"] is None else (", ".join(match["best_players"]["away"]) or "None")
     return f"""
-{home} played {away} in a {match['competition']} match.
-The match took place on {match['date']} at {match['venue']} as part of the {match['competition']} season.
+{home} played {away} in a {competition} match.
+The match took place on {match['date']} at {match['venue']} as part of the {competition} season.
 
 PERIOD SCORES (Cumulative Goals.Behinds):
 End of Period | Q1        | Q2        | Q3        | Q4
@@ -645,6 +646,35 @@ COUNTRY_LEAGUES = {
     "Yorke Peninsula": "yorke-peninsula",
 }
 
+# Reverse map: PlayHQ competition name → country league slug
+# Used to auto-detect the country league from the match data
+PLAYHQ_TO_COUNTRY_LEAGUE = {
+    "Adelaide Plains Football League": "adelaide-plains",
+    "Barossa Light & Gawler Football League": "barossa",
+    "Broken Hill Football League": "broken-hill",
+    "Eastern Eyre Football League": "eastern-eyre",
+    "Far North Football League": "far-north",
+    "Great Flinders Football League": "great-flinders",
+    "Great Southern Football League": "great-southern",
+    "Hills Division 1 Football League": "hills-div1",
+    "Hills Country Division Football League": "hills-country",
+    "Kangaroo Island Football League": "kangaroo-island",
+    "Kowree Naracoorte Tatiara Football League": "knt",
+    "Limestone Coast Football League": "limestone-coast",
+    "Murray Valley Football League": "murray-valley",
+    "Mid South Eastern Football League": "mid-south-eastern",
+    "North Eastern Football League": "north-eastern",
+    "Northern Areas Football League": "northern-areas",
+    "Port Lincoln Football League": "port-lincoln",
+    "River Murray Football League": "river-murray",
+    "Riverland Football League": "riverland",
+    "Southern Football League": "southern",
+    "Spencer Gulf Football League": "spencer-gulf",
+    "Western Eyre Football League": "western-eyre",
+    "Whyalla Football League": "whyalla",
+    "Yorke Peninsula Football League": "yorke-peninsula",
+}
+
 
 def slugify(text):
     text = text.lower().strip()
@@ -718,6 +748,37 @@ def publish_to_sanity(title, slug, competition, excerpt, content_text, author, c
             return True, slug
         else:
             return False, f"Sanity returned status {resp.status_code}: {resp.text}"
+    except Exception as e:
+        return False, str(e)
+
+
+# --------------------------------------------------
+# Facebook Publisher
+# --------------------------------------------------
+def post_to_facebook(message):
+    """Post a message to the configured Facebook Page."""
+    page_id    = os.getenv("FACEBOOK_PAGE_ID") or st.secrets.get("FACEBOOK_PAGE_ID", "")
+    page_token = os.getenv("FACEBOOK_PAGE_TOKEN") or st.secrets.get("FACEBOOK_PAGE_TOKEN", "")
+
+    if not page_id or not page_token:
+        return False, "❌ Facebook credentials not found. Add FACEBOOK_PAGE_ID and FACEBOOK_PAGE_TOKEN to your .env"
+
+    url = f"https://graph.facebook.com/v19.0/{page_id}/feed"
+    payload = {
+        "message": message,
+        "access_token": page_token,
+    }
+
+    try:
+        resp = requests.post(url, data=payload, timeout=15)
+        data = resp.json()
+        if "id" in data:
+            post_id = data["id"]
+            post_url = f"https://www.facebook.com/{page_id}/posts/{post_id.split('_')[-1]}"
+            return True, post_url
+        else:
+            error_msg = data.get("error", {}).get("message", str(data))
+            return False, f"Facebook API error: {error_msg}"
     except Exception as e:
         return False, str(e)
 
@@ -894,8 +955,20 @@ def main_app():
                 ]
                 st.session_state.vectordb = InMemoryVectorStore.from_documents(chunks, OpenAIEmbeddings())
                 st.session_state.selected_match_labels = selected_labels
+
+                # Store competition info from the first match for Step 4 auto-detection
                 first_match = match_map[selected_labels[0]]
-                st.session_state.current_competition = first_match.competition or "AFL"
+                raw_comp = first_match.competition or "AFL"
+                st.session_state.current_competition = raw_comp
+
+                # Auto-detect if this is a Country Football league match
+                detected_league = PLAYHQ_TO_COUNTRY_LEAGUE.get(raw_comp)
+                if detected_league:
+                    st.session_state.current_competition = "Country Football"
+                    st.session_state.detected_country_league = detected_league
+                else:
+                    st.session_state.detected_country_league = None
+
                 st.success(f"🎉 Knowledge base ready! {len(docs)} match(es), {len(chunks)} chunks indexed.")
                 st.balloons()
 
@@ -961,13 +1034,11 @@ Look at the "Match Competitiveness Analysis" in the context to determine the ton
 - If margin > 40 points: Use phrases like "In a dominant display", "In an emphatic victory", "In a comprehensive performance", or "In a one-sided affair"
 - If margin > 90 points: Use phrases like "In an absolute mauling", "In a complete thrashing"
 
-IMPORTANT: The opening MUST reflect the actual competitiveness of the match. Do NOT say "close encounter" if the margin was 50+ points!
+IMPORTANT: The opening MUST reflect the actual competitiveness of the match.
 
 STRUCTURE (USE EXACT HEADINGS):
-
 1. Opening Paragraph (NO HEADING)
 2. Final Scores (EXACT HEADING)
-   Use this exact table format:
    [Home Team]   | [Q1 score] | [Q2 score] | [Q3 score] | [Q4 score]
    [Away Team]   | [Q1 score] | [Q2 score] | [Q3 score] | [Q4 score]
 3. MATCH SUMMARY (EXACT HEADING) - 4 paragraphs, one per quarter
@@ -991,6 +1062,7 @@ CRITICAL RULES:
 1. Use ONLY the exact best players listed in the "BEST PLAYERS (OFFICIAL)" section
 2. Use ONLY the exact goal scorers listed in the "GOAL SCORERS (OFFICIAL)" section
 3. Do NOT invent or guess any player names
+4. Always refer to the competition by its actual name from the context — never call it "Adelaide Footy League" unless that is literally the competition name in the context.
 
 WEB ARTICLE STRUCTURE:
 1. HEADLINE
@@ -1009,12 +1081,13 @@ Write the web article now.
 """
 
             social_media_prompt = """
-You are a social media content creator writing an engaging long-form post about an AFL match.
+You are a social media content creator writing an engaging long-form post about an Australian football match.
 
 CRITICAL RULES:
 1. Use ONLY the exact best players listed in the "BEST PLAYERS (OFFICIAL)" section
 2. Use ONLY the exact goal scorers listed in the "GOAL SCORERS (OFFICIAL)" section
 3. Do NOT invent or guess any player names
+4. Always refer to the competition by its actual name from the context.
 
 SOCIAL MEDIA POST STRUCTURE:
 1. ATTENTION-GRABBING OPENING
@@ -1102,6 +1175,49 @@ Write the social media long-form post now.
             st.text_area("📋 Copy Text", result, height=300)
             st.success("✅ Content generated successfully!")
 
+            # Facebook posting — only shown for social media posts
+            if saved_content_type == "Social media long-form post":
+                st.divider()
+                st.markdown("### 📘 Post to Facebook Page")
+                st.markdown("""
+                <div style='background: rgba(255,255,255,0.12); padding: 1rem; border-radius: 10px;
+                            border: 1px solid rgba(255,255,255,0.2); margin-bottom: 1rem;'>
+                    <p style='color: white; margin: 0; font-size: 0.9rem;'>
+                        Review and edit the post below, then click Post to publish directly to your Facebook Page.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+
+                fb_text = st.text_area(
+                    "✏️ Edit post before sending (optional)",
+                    value=result,
+                    height=220,
+                    key="fb_post_text"
+                )
+
+                fb_char_count = len(fb_text)
+                if fb_char_count > 63206:
+                    st.warning(f"⚠️ Post is {fb_char_count} characters — Facebook limit is 63,206.")
+
+                col_fb1, col_fb2, col_fb3 = st.columns([1, 2, 1])
+                with col_fb2:
+                    fb_button = st.button(
+                        "📘 Post to Facebook Now",
+                        use_container_width=True,
+                        key="fb_post_btn",
+                        type="primary",
+                        disabled=(fb_char_count > 63206)
+                    )
+
+                if fb_button:
+                    with st.spinner("📡 Posting to Facebook..."):
+                        fb_success, fb_result = post_to_facebook(fb_text)
+                    if fb_success:
+                        st.success("🎉 **Posted to Facebook Page!**")
+                        st.info(f"🔗 View post: {fb_result}")
+                    else:
+                        st.error(fb_result)
+
     # --------------------------------------------------
     # Step 4: Publish to Website
     # Outside the vectordb block so it always renders
@@ -1181,9 +1297,16 @@ Write the social media long-form post now.
 
             pub_country_league = None
             if pub_competition == "Country Football":
+                # Auto-detect league from match data if possible
+                detected = st.session_state.get("detected_country_league")
+                league_keys = list(COUNTRY_LEAGUES.keys())
+                league_values = list(COUNTRY_LEAGUES.values())
+                default_league_idx = league_values.index(detected) if detected and detected in league_values else 0
+
                 league_name = st.selectbox(
                     "Country League *",
-                    list(COUNTRY_LEAGUES.keys()),
+                    league_keys,
+                    index=default_league_idx,
                     key="pub_league"
                 )
                 pub_country_league = COUNTRY_LEAGUES[league_name]
