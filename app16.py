@@ -777,8 +777,45 @@ def publish_to_sanity(title, slug, competition, excerpt, content_text, author, c
 # --------------------------------------------------
 # Facebook Publisher
 # --------------------------------------------------
+def clean_for_facebook(text):
+    """
+    Strip markdown formatting that Facebook ignores and renders as literal characters.
+    Replace common section headings with emoji equivalents that stand out in the feed.
+    """
+    # Remove bold/italic markers
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)  # **bold** → plain
+    text = re.sub(r'\*(.*?)\*',     r'\1', text)  # *italic* → plain
+    text = re.sub(r'__(.*?)__',     r'\1', text)  # __bold__ → plain
+    text = re.sub(r'_(.*?)_',       r'\1', text)  # _italic_ → plain
+
+    # Replace common headings with emoji versions
+    replacements = [
+        (r'(?im)^#+\s*ATTENTION[^\n]*',        '🔥 '),
+        (r'(?im)^#+\s*THE STORY[^\n]*',        '📖 THE STORY'),
+        (r'(?im)^#+\s*THE HEROES[^\n]*',       '⭐ THE HEROES'),
+        (r'(?im)^#+\s*BY THE NUMBERS[^\n]*',   '📊 BY THE NUMBERS'),
+        (r'(?im)^#+\s*CLOSING[^\n]*',          '👇 '),
+        (r'(?im)^#+\s*KEY MOMENTS[^\n]*',      '⚡ KEY MOMENTS'),
+        (r'(?im)^#+\s*PLAYER PERFORMANCES[^\n]*', '💪 PLAYER PERFORMANCES'),
+        (r'(?im)^#+\s*THE STATS[^\n]*',        '📊 THE STATS'),
+        (r'(?im)^#+\s*WHAT IT MEANS[^\n]*',    '🏆 WHAT IT MEANS'),
+        (r'(?im)^#+\s*HEADLINE[^\n]*',         ''),
+        (r'(?im)^#+\s*',                        ''),  # any remaining # headings
+    ]
+    for pattern, replacement in replacements:
+        text = re.sub(pattern, replacement, text)
+
+    # Clean up excessive blank lines (max 2 newlines in a row)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+
+    return text.strip()
+
+
 def post_to_facebook(message, image_bytes=None, image_name=None):
-    """Post a message (with optional photo) to the configured Facebook Page."""
+    """Post a message (with optional photo) to the configured Facebook Page.
+    Photos are uploaded unpublished first then attached to a feed post
+    so they appear in the main feed on both desktop and mobile.
+    """
     page_id    = os.getenv("FACEBOOK_PAGE_ID") or st.secrets.get("FACEBOOK_PAGE_ID", "")
     page_token = os.getenv("FACEBOOK_PAGE_TOKEN") or st.secrets.get("FACEBOOK_PAGE_TOKEN", "")
 
@@ -787,16 +824,38 @@ def post_to_facebook(message, image_bytes=None, image_name=None):
 
     try:
         if image_bytes:
-            # Post with photo — use /photos endpoint
-            url = f"https://graph.facebook.com/v19.0/{page_id}/photos"
-            files = {"source": (image_name or "photo.jpg", image_bytes, "image/jpeg")}
-            data  = {"message": message, "access_token": page_token}
-            resp  = requests.post(url, data=data, files=files, timeout=30)
+            # Step 1 — Upload photo as unpublished (no_story=true)
+            # This stages the photo without creating a separate photo post
+            upload_url = f"https://graph.facebook.com/v19.0/{page_id}/photos"
+            files      = {"source": (image_name or "photo.jpg", image_bytes, "image/jpeg")}
+            upload_data = {
+                "published":  "false",
+                "no_story":   "true",
+                "access_token": page_token,
+            }
+            upload_resp = requests.post(upload_url, data=upload_data, files=files, timeout=30)
+            upload_result = upload_resp.json()
+
+            if "id" not in upload_result:
+                error_msg = upload_result.get("error", {}).get("message", str(upload_result))
+                return False, f"Photo upload failed: {error_msg}"
+
+            photo_id = upload_result["id"]
+
+            # Step 2 — Create feed post with photo attached
+            # This appears in the main Page feed on both desktop and mobile
+            feed_url  = f"https://graph.facebook.com/v19.0/{page_id}/feed"
+            feed_data = {
+                "message":           message,
+                "attached_media[0]": json.dumps({"media_fbid": photo_id}),
+                "access_token":      page_token,
+            }
+            resp = requests.post(feed_url, data=feed_data, timeout=15)
+
         else:
-            # Text only — use /feed endpoint
+            # Text only — post directly to feed
             url  = f"https://graph.facebook.com/v19.0/{page_id}/feed"
-            data = {"message": message, "access_token": page_token}
-            resp = requests.post(url, data=data, timeout=15)
+            resp = requests.post(url, data={"message": message, "access_token": page_token}, timeout=15)
 
         result = resp.json()
         if "id" in result:
@@ -806,6 +865,7 @@ def post_to_facebook(message, image_bytes=None, image_name=None):
         else:
             error_msg = result.get("error", {}).get("message", str(result))
             return False, f"Facebook API error: {error_msg}"
+
     except Exception as e:
         return False, str(e)
 
@@ -1120,11 +1180,17 @@ CRITICAL RULES:
 4. Always refer to the competition by its actual name from the context.
 
 SOCIAL MEDIA POST STRUCTURE:
-1. ATTENTION-GRABBING OPENING
-2. THE STORY (quarter by quarter)
-3. THE HEROES
-4. BY THE NUMBERS
+1. ATTENTION-GRABBING OPENING — start with a strong emoji and punchy sentence
+2. THE STORY (quarter by quarter) — use ⚡ Q1, ⚡ Q2 etc to label each quarter
+3. THE HEROES — use ⭐ to highlight each player
+4. BY THE NUMBERS — use 📊 and bullet points with emojis (e.g. 🏆 Final Score, 🎯 Top Scorers)
 5. CLOSING HOOK + hashtags
+
+IMPORTANT FORMATTING RULES:
+- Do NOT use **asterisks** for bold — Facebook renders them as literal characters
+- Do NOT use any markdown formatting at all
+- Use emojis to make headings and key facts stand out instead
+- Keep paragraphs short — 2-3 sentences max
 
 LENGTH: 350-500 words
 
@@ -1220,7 +1286,7 @@ Write the social media long-form post now.
 
                 fb_text = st.text_area(
                     "✏️ Edit post before sending (optional)",
-                    value=result,
+                    value=clean_for_facebook(result),
                     height=220,
                     key="fb_post_text"
                 )
