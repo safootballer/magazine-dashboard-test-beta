@@ -676,6 +676,28 @@ PLAYHQ_TO_COUNTRY_LEAGUE = {
 }
 
 
+AUTHORS = [
+    "Ethan Parker", "Caleb Murphy", "Dylan Fraser", "Blake Henderson",
+    "Nathan Collins", "Connor Walsh", "Jordan Hughes", "Ryan McCarthy",
+    "Mitchell Dawson", "Jake Sullivan", "Tyler Bennett", "Corey Richards",
+    "Ben Lawson", "Josh McLean", "Kyle Donovan", "Aaron Griffiths",
+    "Sam Peterson", "Luke Davidson", "Bailey Thornton", "Trent Gallagher",
+    "Liam O'Connor", "Noah Williams", "Oliver Smith", "William Brown",
+    "James Taylor", "Lucas Wilson", "Henry Anderson", "Alexander Clark",
+    "Charlie Walker", "Mason Hall", "Cooper Allen", "Hudson Young",
+    "Hunter King", "Riley Scott", "Zachary Green", "Isaac Adams",
+    "Max Baker", "Harry Mitchell", "Archie Carter", "Charlotte Johnson",
+    "Olivia White", "Amelia Harris", "Isla Martin", "Mia Thompson",
+    "Ava Robinson", "Grace Lee", "Chloe Walker", "Ella Wright",
+    "Emily Scott", "Harper King", "Sophie Turner", "Evie Collins",
+    "Ruby Stewart", "Willow Morris", "Zoe Bell", "Matilda Cooper",
+    "Lily Ward", "Hannah Brooks", "Lucy Bennett", "Poppy Sanders",
+    "Aria Jenkins", "Layla Price", "Scarlett Murphy", "Ellie Kelly",
+    "Jacklyn Davies", "Brooke Sullivan", "Tahlia McKenzie", "Paige Donnelly",
+    "Tayla Fitzgerald",
+]
+
+
 def slugify(text):
     text = text.lower().strip()
     text = re.sub(r'[^\w\s-]', '', text)
@@ -755,29 +777,34 @@ def publish_to_sanity(title, slug, competition, excerpt, content_text, author, c
 # --------------------------------------------------
 # Facebook Publisher
 # --------------------------------------------------
-def post_to_facebook(message):
-    """Post a message to the configured Facebook Page."""
+def post_to_facebook(message, image_bytes=None, image_name=None):
+    """Post a message (with optional photo) to the configured Facebook Page."""
     page_id    = os.getenv("FACEBOOK_PAGE_ID") or st.secrets.get("FACEBOOK_PAGE_ID", "")
     page_token = os.getenv("FACEBOOK_PAGE_TOKEN") or st.secrets.get("FACEBOOK_PAGE_TOKEN", "")
 
     if not page_id or not page_token:
         return False, "❌ Facebook credentials not found. Add FACEBOOK_PAGE_ID and FACEBOOK_PAGE_TOKEN to your .env"
 
-    url = f"https://graph.facebook.com/v19.0/{page_id}/feed"
-    payload = {
-        "message": message,
-        "access_token": page_token,
-    }
-
     try:
-        resp = requests.post(url, data=payload, timeout=15)
-        data = resp.json()
-        if "id" in data:
-            post_id = data["id"]
+        if image_bytes:
+            # Post with photo — use /photos endpoint
+            url = f"https://graph.facebook.com/v19.0/{page_id}/photos"
+            files = {"source": (image_name or "photo.jpg", image_bytes, "image/jpeg")}
+            data  = {"message": message, "access_token": page_token}
+            resp  = requests.post(url, data=data, files=files, timeout=30)
+        else:
+            # Text only — use /feed endpoint
+            url  = f"https://graph.facebook.com/v19.0/{page_id}/feed"
+            data = {"message": message, "access_token": page_token}
+            resp = requests.post(url, data=data, timeout=15)
+
+        result = resp.json()
+        if "id" in result:
+            post_id  = result["id"]
             post_url = f"https://www.facebook.com/{page_id}/posts/{post_id.split('_')[-1]}"
             return True, post_url
         else:
-            error_msg = data.get("error", {}).get("message", str(data))
+            error_msg = result.get("error", {}).get("message", str(result))
             return False, f"Facebook API error: {error_msg}"
     except Exception as e:
         return False, str(e)
@@ -1010,6 +1037,7 @@ def main_app():
 
             magazine_prompt = """
 You are a professional Australian football journalist writing for a print magazine.
+Write in Australian English throughout — use Australian spelling and expressions (e.g. "colour" not "color", "organisation" not "organization", "centre" not "center", "defence" not "defense", "practise" not "practice", "travelled" not "traveled").
 
 CRITICAL RULES - READ CAREFULLY:
 1. Use ONLY the exact best players listed in the "BEST PLAYERS (OFFICIAL)" section
@@ -1057,6 +1085,7 @@ Write the magazine match report now.
 
             web_article_prompt = """
 You are a digital sports journalist writing an engaging web article for an online audience.
+Write in Australian English throughout — use Australian spelling and expressions (e.g. "colour" not "color", "organisation" not "organization", "centre" not "center", "defence" not "defense").
 
 CRITICAL RULES:
 1. Use ONLY the exact best players listed in the "BEST PLAYERS (OFFICIAL)" section
@@ -1082,6 +1111,7 @@ Write the web article now.
 
             social_media_prompt = """
 You are a social media content creator writing an engaging long-form post about an Australian football match.
+Write in Australian English throughout — use Australian spelling and expressions (e.g. "colour" not "color", "organisation" not "organization", "centre" not "center", "defence" not "defense").
 
 CRITICAL RULES:
 1. Use ONLY the exact best players listed in the "BEST PLAYERS (OFFICIAL)" section
@@ -1183,7 +1213,7 @@ Write the social media long-form post now.
                 <div style='background: rgba(255,255,255,0.12); padding: 1rem; border-radius: 10px;
                             border: 1px solid rgba(255,255,255,0.2); margin-bottom: 1rem;'>
                     <p style='color: white; margin: 0; font-size: 0.9rem;'>
-                        Review and edit the post below, then click Post to publish directly to your Facebook Page.
+                        Review and edit the post below, optionally attach a photo, then click Post.
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -1199,6 +1229,27 @@ Write the social media long-form post now.
                 if fb_char_count > 63206:
                     st.warning(f"⚠️ Post is {fb_char_count} characters — Facebook limit is 63,206.")
 
+                # Photo upload — optional
+                st.markdown("**📷 Attach a photo (optional)**")
+                include_photo = st.radio(
+                    "Include a photo?",
+                    ["No photo — text only", "Yes — upload a photo"],
+                    index=0,
+                    horizontal=True,
+                    key="fb_include_photo"
+                )
+
+                fb_photo = None
+                if include_photo == "Yes — upload a photo":
+                    fb_photo = st.file_uploader(
+                        "Choose an image",
+                        type=["jpg", "jpeg", "png"],
+                        key="fb_photo_upload",
+                        help="JPG or PNG. Will be posted alongside your text."
+                    )
+                    if fb_photo:
+                        st.image(fb_photo, caption="Preview", width=300)
+
                 col_fb1, col_fb2, col_fb3 = st.columns([1, 2, 1])
                 with col_fb2:
                     fb_button = st.button(
@@ -1211,7 +1262,11 @@ Write the social media long-form post now.
 
                 if fb_button:
                     with st.spinner("📡 Posting to Facebook..."):
-                        fb_success, fb_result = post_to_facebook(fb_text)
+                        fb_success, fb_result = post_to_facebook(
+                            fb_text,
+                            image_bytes=fb_photo.read() if fb_photo else None,
+                            image_name=fb_photo.name if fb_photo else None
+                        )
                     if fb_success:
                         st.success("🎉 **Posted to Facebook Page!**")
                         st.info(f"🔗 View post: {fb_result}")
@@ -1276,9 +1331,10 @@ Write the social media long-form post now.
                 key="pub_excerpt"
             )
 
-            pub_author = st.text_input(
+            pub_author = st.selectbox(
                 "Author",
-                value=st.session_state.user['username'],
+                AUTHORS,
+                index=0,
                 key="pub_author"
             )
 
