@@ -176,75 +176,191 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    .stApp { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-    .main-header { text-align: center; color: white; padding: 2rem 0; }
-    .login-card {
-        background: white; padding: 2rem; border-radius: 15px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    /* ── Brand colours: Blue #2ca3ee/#00b8f1 | Yellow #e6fe00 | Black #000 | White #fff ── */
+
+    /* App background: black → dark navy gradient */
+    .stApp {
+        background: linear-gradient(160deg, #000000 0%, #0a1a2e 35%, #0d2b4e 70%, #0e3460 100%);
     }
-    .login-card h3, .login-card p, .login-card label { color: #1e293b !important; }
-    .feature-card {
-        background: white; padding: 1.5rem; border-radius: 10px;
-        text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+
+    /* ── Sidebar: solid black with blue accent border ── */
+    section[data-testid="stSidebar"] {
+        background: #000000 !important;
+        border-right: 3px solid #2ca3ee !important;
     }
-    .content-card {
-        background: white; padding: 2rem; border-radius: 10px;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1); margin: 1rem 0;
-    }
-    .publish-box {
-        background: rgba(255,255,255,0.15); padding: 2rem; border-radius: 16px;
-        border: 2px solid rgba(255,255,255,0.3); backdrop-filter: blur(10px);
-        margin: 1rem 0;
-    }
-    /* ── SAFie branding badge ── */
-    .safie-badge {
-        display: inline-block;
-        background: rgba(255,255,255,0.18);
-        border: 1px solid rgba(255,255,255,0.35);
-        border-radius: 20px;
-        padding: 4px 16px;
-        font-size: 0.78rem;
-        font-weight: 600;
-        letter-spacing: 0.08em;
-        color: rgba(255,255,255,0.92);
-        text-transform: uppercase;
-        margin-top: 6px;
-    }
-    .stTextInput > div > div > input {
-        background-color: #ffffff !important; color: #1e293b !important;
-        border: 2px solid #cbd5e1; border-radius: 10px; padding: 0.75rem;
-    }
-    .stTextInput > div > div > input::placeholder { color: #94a3b8 !important; }
-    .stTextInput > div > div > input:focus {
-        border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
-        background-color: #ffffff !important; color: #1e293b !important;
-    }
-    .stTextInput > label { color: #1e293b !important; font-weight: 500; }
-    .stSelectbox > div > div {
-        background-color: #ffffff !important; color: #1e293b !important;
-        border: 2px solid #cbd5e1; border-radius: 10px;
-    }
-    .stSelectbox > label { color: #1e293b !important; font-weight: 500; }
-    .stTextArea textarea {
-        background-color: #ffffff !important; color: #1e293b !important;
-        border: 2px solid #cbd5e1; border-radius: 10px;
-    }
-    .stTextArea > label { color: #1e293b !important; font-weight: 500; }
-    .stMultiSelect > div > div {
-        background-color: #ffffff !important; color: #1e293b !important;
-        border: 2px solid #cbd5e1; border-radius: 10px;
-    }
-    .stMultiSelect > label { color: #1e293b !important; font-weight: 500; }
     section[data-testid="stSidebar"] h1,
     section[data-testid="stSidebar"] h2,
     section[data-testid="stSidebar"] h3,
     section[data-testid="stSidebar"] p,
     section[data-testid="stSidebar"] label,
     section[data-testid="stSidebar"] span { color: #ffffff !important; }
+    section[data-testid="stSidebar"] [data-testid="metric-container"] {
+        background: #1a1a1a; border: 1px solid #2ca3ee; border-radius: 8px; padding: 0.5rem;
+    }
+
+    /* ── Header ── */
+    .main-header { text-align: center; color: white; padding: 2rem 0; }
+
+    /* ── Login card: white with blue top bar ── */
+    .login-card {
+        background: #ffffff; padding: 2rem; border-radius: 15px;
+        box-shadow: 0 10px 40px rgba(44,163,238,0.3);
+        border-top: 5px solid #2ca3ee;
+    }
+    .login-card h3, .login-card p, .login-card label { color: #000000 !important; }
+
+    /* ── Feature cards: white with yellow bottom bar ── */
+    .feature-card {
+        background: #ffffff; padding: 1.5rem; border-radius: 10px;
+        text-align: center; box-shadow: 0 5px 15px rgba(44,163,238,0.2);
+        border-bottom: 4px solid #e6fe00;
+    }
+    .feature-card h4 { color: #2ca3ee !important; }
+    .feature-card p  { color: #000000 !important; }
+
+    /* ── Content card: white with blue left accent ── */
+    .content-card {
+        background: #ffffff; padding: 2rem; border-radius: 10px;
+        box-shadow: 0 5px 15px rgba(44,163,238,0.15);
+        border-left: 5px solid #2ca3ee; margin: 1rem 0; color: #000000;
+    }
+
+    /* ── Publish box ── */
+    .publish-box {
+        background: rgba(44,163,238,0.08); padding: 2rem; border-radius: 16px;
+        border: 2px solid rgba(44,163,238,0.4); backdrop-filter: blur(10px); margin: 1rem 0;
+    }
+
+    /* ── SAFie badge: yellow pill with black text ── */
+    .safie-badge {
+        display: inline-block;
+        background: #e6fe00;
+        border-radius: 20px;
+        padding: 4px 18px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        color: #000000;
+        text-transform: uppercase;
+        margin-top: 8px;
+    }
+
+    /* ── Form inputs ── */
+    .stTextInput > div > div > input {
+        background-color: #ffffff !important; color: #000000 !important;
+        border: 2px solid #2ca3ee; border-radius: 8px; padding: 0.75rem;
+    }
+    .stTextInput > div > div > input::placeholder { color: #6b7280 !important; }
+    .stTextInput > div > div > input:focus {
+        border-color: #00b8f1; box-shadow: 0 0 0 3px rgba(44,163,238,0.2);
+        background-color: #ffffff !important; color: #000000 !important;
+    }
+    .stTextInput > label { color: #ffffff !important; font-weight: 500; }
+
+    .stSelectbox > div > div {
+        background-color: #ffffff !important; color: #000000 !important;
+        border: 2px solid #2ca3ee; border-radius: 8px;
+    }
+    .stSelectbox > label { color: #ffffff !important; font-weight: 500; }
+
+    .stTextArea textarea {
+        background-color: #ffffff !important; color: #000000 !important;
+        border: 2px solid #2ca3ee; border-radius: 8px;
+    }
+    .stTextArea > label { color: #ffffff !important; font-weight: 500; }
+
+    .stMultiSelect > div > div {
+        background-color: #ffffff !important; color: #000000 !important;
+        border: 2px solid #2ca3ee; border-radius: 8px;
+    }
+    .stMultiSelect > label { color: #ffffff !important; font-weight: 500; }
+
+    /* ── Primary buttons → blue gradient ── */
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(90deg, #2ca3ee, #00b8f1) !important;
+        color: #ffffff !important; border: none !important;
+        font-weight: 700 !important; border-radius: 8px !important;
+    }
+    .stButton > button[kind="primary"]:hover {
+        background: linear-gradient(90deg, #00b8f1, #2ca3ee) !important;
+        box-shadow: 0 4px 16px rgba(44,163,238,0.45) !important;
+    }
+
+    /* ── Secondary buttons → yellow / black ── */
+    .stButton > button:not([kind="primary"]) {
+        background: #e6fe00 !important; color: #000000 !important;
+        border: none !important; font-weight: 700 !important; border-radius: 8px !important;
+    }
+    .stButton > button:not([kind="primary"]):hover {
+        background: #d4eb00 !important;
+        box-shadow: 0 4px 12px rgba(230,254,0,0.4) !important;
+    }
+
+    /* ── Dividers ── */
+    hr { border-color: #2ca3ee !important; opacity: 0.35; }
+
+    /* ── Progress bar ── */
+    .stProgress > div > div > div { background: #2ca3ee !important; }
+
+    /* ── Metric values → yellow; labels → faded white ── */
+    [data-testid="metric-container"] label { color: rgba(255,255,255,0.65) !important; }
+    [data-testid="metric-container"] [data-testid="metric-value"] { color: #e6fe00 !important; font-weight: 800 !important; }
+
+    /* ── Alert colours ── */
     .stSuccess { color: #065f46 !important; }
-    .stInfo    { color: #1e3a8a !important; }
+    .stInfo    { color: #0c4a6e !important; }
     .stWarning { color: #78350f !important; }
     .stError   { color: #7f1d1d !important; }
+
+    /* ── Login card: Sign In button overrides yellow → blue ── */
+    .login-card .stButton > button {
+        background: linear-gradient(90deg, #2ca3ee, #00b8f1) !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        border-radius: 8px !important;
+        border: none !important;
+    }
+    .login-card .stButton > button:hover {
+        background: linear-gradient(90deg, #00b8f1, #2ca3ee) !important;
+        box-shadow: 0 4px 16px rgba(44,163,238,0.4) !important;
+    }
+
+    /* ── Login card: input labels should be dark not white ── */
+    .login-card .stTextInput > label { color: #000000 !important; }
+
+    /* ── Competition group heading: blue border-bottom like website ── */
+    .comp-heading {
+        color: #2ca3ee;
+        font-size: 1.2rem;
+        font-weight: 800;
+        border-bottom: 3px solid #2ca3ee;
+        padding-bottom: 6px;
+        margin-bottom: 12px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    /* ── Expander (match detail panels) ── */
+    details summary { color: #2ca3ee !important; font-weight: 600; }
+    details { background: #000000 !important; border: 1px solid #2ca3ee !important; border-radius: 8px !important; }
+
+    /* ── Radio buttons ── */
+    .stRadio > label { color: #ffffff !important; }
+
+    /* ── File uploader ── */
+    .stFileUploader > label { color: #ffffff !important; }
+    [data-testid="stFileUploadDropzone"] {
+        background: #000000 !important;
+        border: 2px dashed #2ca3ee !important;
+        border-radius: 8px !important;
+        color: #ffffff !important;
+    }
+
+    /* ── Spinner text ── */
+    .stSpinner > div { color: #2ca3ee !important; }
+
+    /* ── Checkbox ── */
+    .stCheckbox > label { color: #ffffff !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -274,7 +390,7 @@ def render_logo_center():
         st.markdown("""
         <div style="text-align:center; padding-top: 12px;">
             <h1 style="margin:0; font-size:2.6rem; font-weight:800;
-                       color:white; letter-spacing:-0.02em; line-height:1.1;">
+                       color:#2ca3ee; letter-spacing:-0.02em; line-height:1.1;">
                 SAFie
             </h1>
             <span class="safie-badge">AI by SA Footballer</span>
@@ -344,9 +460,9 @@ def verify_login(username, password):
 # --------------------------------------------------
 def login_page():
     st.markdown('<div class="main-header">', unsafe_allow_html=True)
-    st.markdown('<h1 style="margin: 0; font-size: 3rem; color: white; font-weight: 800;">SAFie</h1>', unsafe_allow_html=True)
-    st.markdown('<p style="font-size: 1.2rem; margin-top: 0.4rem; color: white; opacity: 0.9;">AI by SA Footballer</p>', unsafe_allow_html=True)
-    st.markdown('<p style="font-size: 0.95rem; margin-top: 0.2rem; color: rgba(255,255,255,0.7);">AI-Powered Match Report Generation</p>', unsafe_allow_html=True)
+    st.markdown('<h1 style="margin: 0; font-size: 3rem; color: #2ca3ee; font-weight: 800;">SAFie</h1>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size: 1.1rem; margin-top: 0.3rem; color: #e6fe00; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;">AI by SA Footballer</p>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size: 0.9rem; margin-top: 0.1rem; color: rgba(255,255,255,0.65);">AI-Powered Match Report Generation</p>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -358,7 +474,7 @@ def login_page():
         username = st.text_input("👤 Username", placeholder="Enter your username")
         password = st.text_input("🔒 Password", type="password", placeholder="Enter your password")
         st.markdown("&nbsp;", unsafe_allow_html=True)
-        if st.button("🚀 Sign In", use_container_width=True):
+        if st.button("🚀 Sign In", use_container_width=True, type="primary"):
             if username and password:
                 user = verify_login(username, password)
                 if user:
@@ -381,6 +497,20 @@ def login_page():
         st.markdown("""<div class="feature-card"><h2>🎯</h2><h4>Accurate</h4><p>Powered by AI technology</p></div>""", unsafe_allow_html=True)
     with col3:
         st.markdown("""<div class="feature-card"><h2>✍️</h2><h4>Professional</h4><p>Magazine-quality content</p></div>""", unsafe_allow_html=True)
+
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style='background:#000000; border-top:3px solid #2ca3ee; padding:1.2rem 2rem;
+                border-radius:10px; text-align:center; margin-top:1rem;'>
+        <p style='margin:0; color:rgba(255,255,255,0.5); font-size:0.78rem;'>
+            <span style='color:#2ca3ee; font-weight:700;'>SAFie</span>
+            &nbsp;·&nbsp;
+            <span style='color:#e6fe00; font-weight:600;'>AI by SA Footballer</span>
+            &nbsp;·&nbsp;
+            <span>© 2026 The South Australian Footballer. All rights reserved.</span>
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 def logout():
@@ -914,14 +1044,14 @@ def main_app():
 
         st.markdown("""
         <div style="text-align:center; margin: 4px 0 12px 0;">
-            <span style="color:white; font-size:1.1rem; font-weight:700;">SAFie</span><br>
-            <span style="color:rgba(255,255,255,0.65); font-size:0.72rem; letter-spacing:0.06em;">
+            <span style="color:#2ca3ee; font-size:1.1rem; font-weight:700;">SAFie</span><br>
+            <span style="color:#e6fe00; font-size:0.72rem; font-weight:700; letter-spacing:0.08em;">
                 AI BY SA FOOTBALLER
             </span>
         </div>
         """, unsafe_allow_html=True)
 
-        st.markdown("### 👤 User Profile")
+        st.markdown("<p style='color:#2ca3ee; font-weight:700; font-size:1rem; border-bottom:2px solid #2ca3ee; padding-bottom:4px;'>👤 User Profile</p>", unsafe_allow_html=True)
         st.markdown(f"**Name:** {st.session_state.user['username']}")
         st.markdown(f"**Role:** {st.session_state.user['role'].upper()}")
         st.divider()
@@ -941,23 +1071,30 @@ def main_app():
         if st.button("🚪 Logout", use_container_width=True):
             logout()
         st.divider()
-        st.markdown("### 📚 Quick Guide")
+        st.markdown("<p style='color:#2ca3ee; font-weight:700; font-size:1rem; border-bottom:2px solid #2ca3ee; padding-bottom:4px;'>📚 Quick Guide</p>", unsafe_allow_html=True)
         st.markdown("""
-1. **Select** matches from dropdown
-2. **Build** knowledge base
-3. **Generate** content
-4. **Publish** live to website
-        """)
+<p style='color:rgba(255,255,255,0.85); font-size:0.88rem; line-height:1.8; margin:0;'>
+1. <strong style='color:#e6fe00;'>Select</strong> matches from dropdown<br>
+2. <strong style='color:#e6fe00;'>Build</strong> knowledge base<br>
+3. <strong style='color:#e6fe00;'>Generate</strong> content<br>
+4. <strong style='color:#e6fe00;'>Publish</strong> live to website
+</p>
+        """, unsafe_allow_html=True)
 
     # ── Main header ──────────────────────────────────────────────
-    st.markdown("# 🏈 SAFie — AI by SA Footballer")
-    st.markdown(f"### Welcome back, **{st.session_state.user['username']}**! 👋")
+    st.markdown(
+        "<h1 style='color:#2ca3ee; font-weight:800; margin-bottom:0;'>🏈 SAFie</h1>"
+        "<p style='color:#e6fe00; font-size:0.9rem; font-weight:700; letter-spacing:0.08em; "
+        "text-transform:uppercase; margin-top:2px;'>AI by SA Footballer</p>",
+        unsafe_allow_html=True
+    )
+    st.markdown(f"<p style='color:rgba(255,255,255,0.85); font-size:1.1rem;'>Welcome back, <strong style='color:#ffffff;'>{st.session_state.user['username']}</strong>! 👋</p>", unsafe_allow_html=True)
     st.divider()
 
     # --------------------------------------------------
     # Step 1: Select Matches
     # --------------------------------------------------
-    st.markdown("## 🏈 Step 1: Select Matches")
+    st.markdown("<h2 style='color:#2ca3ee;border-bottom:3px solid #2ca3ee;padding-bottom:6px;'>🏈 Step 1: Select Matches</h2>", unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
 
     db = get_db()
@@ -968,10 +1105,10 @@ def main_app():
 
     if not match_links:
         st.markdown("""
-        <div style='background: rgba(255,255,255,0.15); padding: 2rem; border-radius: 16px;
-                    text-align: center; backdrop-filter: blur(10px);'>
-            <h3 style='color: white;'>📭 No Matches Available Yet</h3>
-            <p style='color: rgba(255,255,255,0.8);'>
+        <div style='background: #000000; padding: 2rem; border-radius: 16px;
+                    text-align: center; border: 2px solid #2ca3ee;'>
+            <h3 style='color: #e6fe00;'>📭 No Matches Available Yet</h3>
+            <p style='color: rgba(255,255,255,0.85);'>
                 Your admin team hasn't added this week's matches yet. Please check back soon!
             </p>
         </div>
@@ -993,7 +1130,7 @@ def main_app():
             dropdown_options.append(label)
             match_map[label] = m
 
-    st.markdown("**Select one or more matches to generate content for:**")
+    st.markdown("<p style='color:#ffffff; font-weight:600; font-size:0.95rem;'>Select one or more matches to generate content for:</p>", unsafe_allow_html=True)
     selected_labels = st.multiselect(
         "Available Matches",
         options=dropdown_options,
@@ -1003,22 +1140,22 @@ def main_app():
 
     if not selected_labels:
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("### 📅 Available Matches")
+        st.markdown("<h3 style='color:#2ca3ee;border-bottom:2px solid #2ca3ee;padding-bottom:4px;'>📅 Available Matches</h3>", unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
         for comp, comp_matches in competitions.items():
-            st.markdown(f"**🏆 {comp}**")
+            st.markdown(f"<p class='comp-heading'>🏆 {comp}</p>", unsafe_allow_html=True)
             cols = st.columns(min(len(comp_matches), 3))
             for i, m in enumerate(comp_matches):
                 with cols[i % 3]:
                     st.markdown(f"""
-                    <div style='background: rgba(255,255,255,0.15); padding: 1rem; border-radius: 12px;
-                                border: 1px solid rgba(255,255,255,0.2); margin-bottom: 1rem;'>
-                        <p style='color: white; font-weight: 700; margin: 0; font-size: 1rem;'>{m.home_team}</p>
-                        <p style='color: rgba(255,255,255,0.6); margin: 0.2rem 0; font-size: 0.85rem;'>vs</p>
-                        <p style='color: white; font-weight: 700; margin: 0; font-size: 1rem;'>{m.away_team}</p>
-                        <hr style='border-color: rgba(255,255,255,0.2); margin: 0.75rem 0;'>
-                        <p style='color: rgba(255,255,255,0.8); margin: 0; font-size: 0.8rem;'>📅 {m.date[:10] if m.date else 'TBD'}</p>
-                        <p style='color: rgba(255,255,255,0.8); margin: 0.2rem 0; font-size: 0.8rem;'>📍 {m.venue or 'TBD'}</p>
+                    <div style='background: #000000; padding: 1rem; border-radius: 12px;
+                                border: 1px solid #2ca3ee; margin-bottom: 1rem;'>
+                        <p style='color: #ffffff; font-weight: 700; margin: 0; font-size: 1rem;'>{m.home_team}</p>
+                        <p style='color: #2ca3ee; margin: 0.2rem 0; font-size: 0.85rem;'>vs</p>
+                        <p style='color: #ffffff; font-weight: 700; margin: 0; font-size: 1rem;'>{m.away_team}</p>
+                        <hr style='border-color: #2ca3ee; opacity:0.3; margin: 0.75rem 0;'>
+                        <p style='color: rgba(255,255,255,0.75); margin: 0; font-size: 0.8rem;'>📅 {m.date[:10] if m.date else 'TBD'}</p>
+                        <p style='color: rgba(255,255,255,0.75); margin: 0.2rem 0; font-size: 0.8rem;'>📍 {m.venue or 'TBD'}</p>
                     </div>
                     """, unsafe_allow_html=True)
             st.markdown("<br>", unsafe_allow_html=True)
@@ -1029,7 +1166,7 @@ def main_app():
     # Step 2: Build Knowledge Base
     # --------------------------------------------------
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("## 🧠 Step 2: Build Knowledge Base")
+    st.markdown("<h2 style='color:#2ca3ee;border-bottom:3px solid #2ca3ee;padding-bottom:6px;'>🧠 Step 2: Build Knowledge Base</h2>", unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
 
     cols = st.columns(min(len(selected_labels), 3))
@@ -1037,15 +1174,15 @@ def main_app():
         m = match_map[label]
         with cols[i % 3]:
             st.markdown(f"""
-            <div style='background: rgba(255,255,255,0.2); padding: 1rem; border-radius: 12px;
-                        border: 2px solid rgba(255,255,255,0.4); margin-bottom: 1rem;'>
-                <p style='color: white; font-weight: 700; margin: 0; font-size: 1.05rem;'>
+            <div style='background: #000000; padding: 1rem; border-radius: 12px;
+                        border: 2px solid #2ca3ee; margin-bottom: 1rem;'>
+                <p style='color: #e6fe00; font-weight: 700; margin: 0; font-size: 1.05rem;'>
                     ✅ {m.home_team} vs {m.away_team}
                 </p>
-                <p style='color: rgba(255,255,255,0.8); margin: 0.5rem 0 0 0; font-size: 0.85rem;'>
+                <p style='color: rgba(255,255,255,0.85); margin: 0.5rem 0 0 0; font-size: 0.85rem;'>
                     📅 {m.date[:10] if m.date else 'TBD'} · 📍 {m.venue or 'TBD'}
                 </p>
-                <p style='color: rgba(255,255,255,0.7); margin: 0.25rem 0 0 0; font-size: 0.8rem;'>
+                <p style='color: #2ca3ee; margin: 0.25rem 0 0 0; font-size: 0.8rem;'>
                     🏆 {m.competition}
                 </p>
             </div>
@@ -1109,7 +1246,7 @@ def main_app():
     # --------------------------------------------------
     if "vectordb" in st.session_state:
         st.divider()
-        st.markdown("## ✍️ Step 3: Generate Content")
+        st.markdown("<h2 style='color:#2ca3ee;border-bottom:3px solid #2ca3ee;padding-bottom:6px;'>✍️ Step 3: Generate Content</h2>", unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
 
         if "content_type_selection" not in st.session_state:
@@ -1300,7 +1437,7 @@ Write the social media long-form post now.
             result = st.session_state.generated_content
             saved_content_type = st.session_state.get("generated_content_type", "")
 
-            st.markdown("## 📄 Generated Content")
+            st.markdown("<h2 style='color:#2ca3ee;border-bottom:3px solid #2ca3ee;padding-bottom:6px;'>📄 Generated Content</h2>", unsafe_allow_html=True)
             st.markdown('<div class="content-card">', unsafe_allow_html=True)
             st.markdown(result)
             st.markdown('</div>', unsafe_allow_html=True)
@@ -1319,10 +1456,10 @@ Write the social media long-form post now.
             # Facebook posting — only shown for social media posts
             if saved_content_type == "Social media long-form post":
                 st.divider()
-                st.markdown("### 📘 Post to Facebook Page")
+                st.markdown("<h3 style='color:#2ca3ee;border-bottom:2px solid #2ca3ee;padding-bottom:4px;'>📘 Post to Facebook Page</h3>", unsafe_allow_html=True)
                 st.markdown("""
-                <div style='background: rgba(255,255,255,0.12); padding: 1rem; border-radius: 10px;
-                            border: 1px solid rgba(255,255,255,0.2); margin-bottom: 1rem;'>
+                <div style='background: #000000; padding: 1rem; border-radius: 10px;
+                            border: 1px solid #2ca3ee; margin-bottom: 1rem;'>
                     <p style='color: white; margin: 0; font-size: 0.9rem;'>
                         Review and edit the post below, optionally attach a photo, then click Post.
                     </p>
@@ -1340,7 +1477,7 @@ Write the social media long-form post now.
                 if fb_char_count > 63206:
                     st.warning(f"⚠️ Post is {fb_char_count} characters — Facebook limit is 63,206.")
 
-                st.markdown("**📷 Attach a photo (optional)**")
+                st.markdown("<p style='color:#ffffff; font-weight:700; font-size:0.95rem;'>📷 Attach a photo <span style='color:rgba(255,255,255,0.5); font-weight:400;'>(optional)</span></p>", unsafe_allow_html=True)
                 include_photo = st.radio(
                     "Include a photo?",
                     ["No photo — text only", "Yes — upload a photo"],
@@ -1388,7 +1525,7 @@ Write the social media long-form post now.
     # --------------------------------------------------
     if "generated_content" in st.session_state:
         st.divider()
-        st.markdown("## 🚀 Step 4: Publish to SA Footballer Website")
+        st.markdown("<h2 style='color:#2ca3ee;border-bottom:3px solid #2ca3ee;padding-bottom:6px;'>🚀 Step 4: Publish to SA Footballer Website</h2>", unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
 
         if st.session_state.get("publish_success"):
@@ -1398,10 +1535,10 @@ Write the social media long-form post now.
             st.markdown("<br>", unsafe_allow_html=True)
 
         st.markdown("""
-        <div style='background: rgba(255,255,255,0.12); padding: 1.5rem; border-radius: 12px;
-                    border: 1px solid rgba(255,255,255,0.25); margin-bottom: 1rem;'>
+        <div style='background: #000000; padding: 1.5rem; border-radius: 12px;
+                    border-left: 5px solid #e6fe00; margin-bottom: 1rem;'>
             <p style='color: white; margin: 0; font-size: 0.95rem;'>
-                Fill in the details below and hit <strong>Publish Live</strong> —
+                Fill in the details below and hit <strong style="color:#e6fe00;">Publish Live</strong> —
                 your article will appear on the Editorials page immediately. No Sanity Studio needed.
             </p>
         </div>
@@ -1535,6 +1672,21 @@ Write the social media long-form post now.
                 st.success("💾 Draft saved in Sanity Studio. Go to Studio to review and publish.")
             else:
                 st.error(f"❌ Draft save failed: {result_msg}")
+
+    # ── Footer ──────────────────────────────────────────────────
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style='background:#000000; border-top:3px solid #2ca3ee; padding:1.2rem 2rem;
+                border-radius:10px; text-align:center; margin-top:2rem;'>
+        <p style='margin:0; color:rgba(255,255,255,0.5); font-size:0.78rem;'>
+            <span style='color:#2ca3ee; font-weight:700;'>SAFie</span>
+            &nbsp;·&nbsp;
+            <span style='color:#e6fe00; font-weight:600;'>AI by SA Footballer</span>
+            &nbsp;·&nbsp;
+            <span>© 2026 The South Australian Footballer. All rights reserved.</span>
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # --------------------------------------------------
