@@ -146,6 +146,18 @@ st.markdown("""
         box-shadow: 0 10px 36px rgba(230,254,0,0.5);
         color: #000000 !important;
     }
+    .launch-btn-default {
+        background: linear-gradient(135deg, #2ca3ee 0%, #00b8f1 100%);
+        color: #ffffff !important;
+        box-shadow: 0 6px 24px rgba(44,163,238,0.35);
+        display: block;
+        text-align: center;
+    }
+    .launch-btn-default:hover {
+        background: linear-gradient(135deg, #00b8f1 0%, #2ca3ee 100%);
+        box-shadow: 0 10px 36px rgba(44,163,238,0.55);
+        color: #ffffff !important;
+    }
 
     /* ── Quick-access links ── */
     .quick-link {
@@ -228,7 +240,7 @@ def main():
         st.markdown("""
         <div style="text-align:center; padding-top:10px;">
             <h1 style="margin:0; font-size:2.4rem; font-weight:900; color:#2ca3ee; letter-spacing:3px;">
-                SOUTH AUSTRALIAN FOOTBALLER
+                THE SOUTH AUSTRALIAN FOOTBALLER
             </h1>
             <span style="display:inline-block; background:#e6fe00; color:#000; font-size:0.72rem;
                          font-weight:700; letter-spacing:0.1em; text-transform:uppercase;
@@ -296,72 +308,56 @@ def main():
         </a>
         """, unsafe_allow_html=True)
 
-    # ── Admin card (Streamlit button — bypasses HTML link issue) ──
+    # ── Admin card (full card as link — matches SAFie) ──────────
     with col2:
         st.markdown("""
-        <div class="service-card" style="min-height:360px;">
-            <div>
-                <div class="service-icon">⚙️</div>
-                <div class="service-title">Admin Dashboard</div>
-                <div class="service-description">
-                    Complete analytics, user management, cost tracking,
-                    match links, and full system administration.
+        <a href="https://magazine-admin.onrender.com" target="_blank" rel="noopener noreferrer"
+           style="text-decoration:none; display:block;">
+            <div class="service-card">
+                <div>
+                    <div class="service-icon">⚙️</div>
+                    <div class="service-title">Admin Dashboard</div>
+                    <div class="service-description">
+                        Complete analytics, user management, cost tracking,
+                        match links, and full system administration.
+                    </div>
+                    <span class="badge badge-admin">Admin</span>
                 </div>
-                <span class="badge badge-admin">Admin</span>
+                <div>
+                    <span class="launch-btn launch-btn-default">🚀 Launch Admin Dashboard</span>
+                </div>
             </div>
-            <div id="admin-btn-placeholder"></div>
-        </div>
+        </a>
         """, unsafe_allow_html=True)
-        # Real Streamlit button rendered below the card HTML
-        if st.button("🚀 Launch Admin Dashboard", key="btn_admin", type="primary", use_container_width=True):
-            st.markdown('<script>window.open("https://magazine-admin.onrender.com","_blank");</script>',
-                        unsafe_allow_html=True)
-        st.markdown(
-            '<p style="text-align:center; margin-top:6px;">'
-            '<a href="https://magazine-admin.onrender.com" target="_blank" '
-            'style="color:#2ca3ee; font-size:0.82rem; font-weight:600;">↗ Open in new tab</a></p>',
-            unsafe_allow_html=True
-        )
 
-    # ── League & Ladder card (TWO buttons) ───────────────────────
+    # ── League & Ladder card (TWO buttons inside card) ───────────
     with col3:
         st.markdown("""
-        <div class="service-card" style="min-height:360px;">
+        <div class="service-card">
             <div>
                 <div class="service-icon">🏆</div>
                 <div class="service-title">League &amp; Ladder</div>
                 <div class="service-description">
-                    Live league ladders, standings, and player statistics
-                    synced daily from PlayHQ.
+                    Live league ladders, standings, and player statistics.
                 </div>
                 <span class="badge badge-stats">Stats</span>
             </div>
-            <div id="league-btn-placeholder"></div>
+            <div style="display:flex; gap:12px; margin-top:1.2rem;">
+                <a href="https://ladder-hu0e.onrender.com" target="_blank" rel="noopener noreferrer"
+                   style="flex:1; text-decoration:none;">
+                    <span class="launch-btn launch-btn-default" style="font-size:0.82rem; padding:0.85rem 0.5rem;">
+                        🏅 Ladder
+                    </span>
+                </a>
+                <a href="https://player-stats-app-a176.onrender.com" target="_blank" rel="noopener noreferrer"
+                   style="flex:1; text-decoration:none;">
+                    <span class="launch-btn launch-btn-default" style="font-size:0.82rem; padding:0.85rem 0.5rem;">
+                        📊 Player Stats
+                    </span>
+                </a>
+            </div>
         </div>
         """, unsafe_allow_html=True)
-
-        # Two side-by-side buttons
-        b1, b2 = st.columns(2)
-        with b1:
-            if st.button("🏅 Ladder", key="btn_ladder", type="primary", use_container_width=True):
-                st.markdown('<script>window.open("https://ladder-hu0e.onrender.com","_blank");</script>',
-                            unsafe_allow_html=True)
-            st.markdown(
-                '<p style="text-align:center; margin-top:4px;">'
-                '<a href="https://ladder-hu0e.onrender.com" target="_blank" '
-                'style="color:#2ca3ee; font-size:0.78rem; font-weight:600;">↗ Open</a></p>',
-                unsafe_allow_html=True
-            )
-        with b2:
-            if st.button("📊 Player Stats", key="btn_stats", type="primary", use_container_width=True):
-                st.markdown('<script>window.open("https://player-stats-app-a176.onrender.com","_blank");</script>',
-                            unsafe_allow_html=True)
-            st.markdown(
-                '<p style="text-align:center; margin-top:4px;">'
-                '<a href="https://player-stats-app-a176.onrender.com" target="_blank" '
-                'style="color:#2ca3ee; font-size:0.78rem; font-weight:600;">↗ Open</a></p>',
-                unsafe_allow_html=True
-            )
 
     # ── Quick-access links ────────────────────────────────────────
     st.markdown("<br><br>", unsafe_allow_html=True)
@@ -379,7 +375,7 @@ def main():
         ("⚙️", "Admin Dashboard", "#ffffff", "https://magazine-admin.onrender.com",
          "Complete analytics, user management, cost tracking…"),
         ("🏅", "Ladder", "#ffffff", "https://ladder-hu0e.onrender.com",
-         "Live league ladders and standings from PlayHQ…"),
+         "Live league ladders and standings."),
         ("📊", "Player Stats", "#ffffff", "https://player-stats-app-a176.onrender.com",
          "GP, Goals, Best Player awards per league…"),
     ]
