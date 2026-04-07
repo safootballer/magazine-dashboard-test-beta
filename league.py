@@ -21,7 +21,7 @@ st.set_page_config(
 )
 
 # --------------------------------------------------
-# DATABASE SETUP WITH POSTGRESQL
+# DATABASE SETUP
 # --------------------------------------------------
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///magazine.db')
 
@@ -34,6 +34,19 @@ Base = declarative_base()
 # --------------------------------------------------
 # DATABASE MODELS
 # --------------------------------------------------
+class League(Base):
+    """Saved leagues that get auto-synced daily."""
+    __tablename__ = 'leagues'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    grade_id = Column(String(255), unique=True, nullable=False)
+    grade_name = Column(String(255))
+    season = Column(String(255))
+    url = Column(Text)
+    added_by = Column(String(255))
+    added_at = Column(String(255))
+    last_synced_at = Column(String(255))
+    sync_enabled = Column(Integer, default=1)  # 1 = enabled, 0 = disabled
+
 class Ladder(Base):
     __tablename__ = 'ladder'
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -63,156 +76,32 @@ class User(Base):
     created_at = Column(String(255))
     last_login = Column(String(255))
 
-# Create tables
 Base.metadata.create_all(engine)
 
-# Migration function to add missing columns
+# --------------------------------------------------
+# MIGRATION
+# --------------------------------------------------
 def migrate_database():
-    """Add any missing columns to existing tables"""
     inspector = inspect(engine)
-    
+
     if 'ladder' in inspector.get_table_names():
-        existing_columns = [col['name'] for col in inspector.get_columns('ladder')]
-        
-        if 'byes' not in existing_columns:
-            try:
-                with engine.connect() as conn:
-                    conn.execute(text("ALTER TABLE ladder ADD COLUMN byes INTEGER DEFAULT 0"))
-                    conn.commit()
-                print("✅ Added byes column to ladder table")
-            except Exception as e:
-                print(f"⚠️ Could not add byes column: {e}")
+        existing = [c['name'] for c in inspector.get_columns('ladder')]
+        if 'byes' not in existing:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE ladder ADD COLUMN byes INTEGER DEFAULT 0"))
+                conn.commit()
 
 migrate_database()
 
 SessionLocal = sessionmaker(bind=engine)
 
 def get_db():
-    db = SessionLocal()
-    try:
-        return db
-    except Exception as e:
-        db.close()
-        raise e
+    return SessionLocal()
 
 # --------------------------------------------------
-# CUSTOM CSS
-# --------------------------------------------------
-st.markdown("""
-<style>
-    .stApp {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-    
-    h1, h2, h3 {
-        color: white !important;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
-    }
-    
-    section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1e293b 0%, #334155 100%);
-    }
-    
-    section[data-testid="stSidebar"] * {
-        color: white !important;
-    }
-    
-    .stDataFrame {
-        background: white;
-        border-radius: 12px;
-        padding: 1rem;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-    }
-    
-    .stButton>button {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-        color: white;
-        border: none;
-        padding: 0.75rem 2rem;
-        border-radius: 12px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-    }
-    
-    .stButton>button:hover {
-        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
-    }
-    
-    .stTextInput>div>div>input {
-        border-radius: 10px;
-        border: 2px solid #e2e8f0;
-        padding: 0.75rem;
-    }
-    
-    .stSuccess {
-        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-        border-left-color: #10b981;
-        border-radius: 12px;
-    }
-    
-    .stError {
-        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-        border-left-color: #ef4444;
-        border-radius: 12px;
-    }
-    
-    .stInfo {
-        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-        border-left-color: #3b82f6;
-        border-radius: 12px;
-    }
-    
-    .stWarning {
-        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-        border-left-color: #f59e0b;
-        border-radius: 12px;
-    }
-    
-    div[data-testid="metric-container"] {
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        padding: 1.5rem;
-        border-radius: 15px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-        border: 1px solid rgba(226, 232, 240, 0.8);
-    }
-    
-    div[data-testid="stExpander"] {
-        background: rgba(255, 255, 255, 0.95);
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# --------------------------------------------------
-# AUTH
-# --------------------------------------------------
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
-
-def verify_login(username, password):
-    db = get_db()
-    try:
-        pw_hash = hash_password(password)
-        user = db.query(User).filter_by(
-            username=username,
-            password_hash=pw_hash
-        ).first()
-        
-        if user:
-            return {"id": user.id, "username": user.username, "role": user.role}
-        return None
-    finally:
-        db.close()
-
-# --------------------------------------------------
-# PLAYHQ CONFIG
+# PLAYHQ
 # --------------------------------------------------
 PLAYHQ_URL = "https://api.playhq.com/graphql"
-
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "Content-Type": "application/json",
@@ -221,46 +110,6 @@ HEADERS = {
     "tenant": "afl"
 }
 
-# --------------------------------------------------
-# HELPERS
-# --------------------------------------------------
-def extract_grade_id(url: str):
-    if not url:
-        return None
-    parts = url.rstrip("/").split("/")
-    for p in reversed(parts):
-        if len(p) >= 6:
-            return p
-    return None
-
-def safe_post(payload):
-    try:
-        r = requests.post(
-            PLAYHQ_URL,
-            headers=HEADERS,
-            json=payload,
-            timeout=30
-        )
-
-        if r.status_code != 200:
-            st.error(f"PlayHQ request failed ({r.status_code})")
-            st.code(r.text)
-            return None
-
-        data = r.json()
-        if "data" not in data:
-            st.error("Invalid PlayHQ response")
-            st.code(data)
-            return None
-
-        return data["data"]
-    except Exception as e:
-        st.error(f"Request error: {e}")
-        return None
-
-# --------------------------------------------------
-# GRAPHQL QUERIES
-# --------------------------------------------------
 GRADE_META_QUERY = """
 query GradeMeta($gradeID: ID!) {
   discoverGrade(gradeID: $gradeID) {
@@ -277,13 +126,8 @@ query GradeLadder($gradeID: ID!) {
     ladder {
       generatedFrom { id name }
       standings {
-        played
-        won
-        lost
-        drawn
-        byes
-        competitionPoints
-        alternatePercentage
+        played won lost drawn byes
+        competitionPoints alternatePercentage
         team { id name }
       }
     }
@@ -291,40 +135,46 @@ query GradeLadder($gradeID: ID!) {
 }
 """
 
-# --------------------------------------------------
-# DATA FUNCTIONS
-# --------------------------------------------------
-def fetch_grade_meta(grade_id):
-    payload = {
-        "query": GRADE_META_QUERY,
-        "variables": {"gradeID": grade_id}
-    }
-    data = safe_post(payload)
-    if not data:
+def extract_grade_id(url: str):
+    if not url:
+        return None
+    parts = url.rstrip("/").split("/")
+    for p in reversed(parts):
+        if len(p) >= 6:
+            return p
+    return None
+
+def safe_post(payload):
+    try:
+        r = requests.post(PLAYHQ_URL, headers=HEADERS, json=payload, timeout=30)
+        if r.status_code != 200:
+            return None
+        data = r.json()
+        return data.get("data")
+    except Exception:
         return None
 
-    g = data["discoverGrade"]
-    return {
-        "id": g["id"],
-        "name": g["name"],
-        "season": g["season"]["name"]
-    }
-
-def sync_ladder(grade_id, grade_name, season):
-    synced_at = datetime.utcnow().isoformat()
-
-    payload = {
-        "query": LADDER_QUERY,
-        "variables": {"gradeID": grade_id}
-    }
-    data = safe_post(payload)
+def fetch_grade_meta(grade_id):
+    data = safe_post({"query": GRADE_META_QUERY, "variables": {"gradeID": grade_id}})
     if not data:
-        return
+        return None
+    g = data["discoverGrade"]
+    return {"id": g["id"], "name": g["name"], "season": g["season"]["name"]}
 
-    grade = data["discoverGrade"]
+def sync_ladder(grade_id, grade_name, season, silent=False):
+    """Sync ladder for a single grade. silent=True suppresses st.* calls (for cron use)."""
+    synced_at = datetime.utcnow().isoformat()
+    data = safe_post({"query": LADDER_QUERY, "variables": {"gradeID": grade_id}})
+    if not data:
+        if not silent:
+            st.error("❌ Failed to fetch ladder from PlayHQ")
+        return False
+
+    grade = data.get("discoverGrade")
     if not grade or not grade.get("ladder"):
-        st.warning("No ladder data returned")
-        return
+        if not silent:
+            st.warning("No ladder data returned")
+        return False
 
     db = get_db()
     try:
@@ -339,214 +189,302 @@ def sync_ladder(grade_id, grade_name, season):
                     round_id=round_id
                 ).first()
 
+                vals = dict(
+                    grade_id=grade_id,
+                    grade_name=grade_name,
+                    round_name=round_name,
+                    team_name=row["team"]["name"],
+                    rank=idx,
+                    played=row["played"],
+                    wins=row["won"],
+                    losses=row["lost"],
+                    draws=row["drawn"],
+                    byes=row.get("byes", 0),
+                    points=row["competitionPoints"],
+                    percentage=row["alternatePercentage"],
+                    synced_at=synced_at
+                )
+
                 if existing:
-                    existing.grade_id = grade_id
-                    existing.grade_name = grade_name
-                    existing.round_name = round_name
-                    existing.team_name = row["team"]["name"]
-                    existing.rank = idx
-                    existing.played = row["played"]
-                    existing.wins = row["won"]
-                    existing.losses = row["lost"]
-                    existing.draws = row["drawn"]
-                    existing.byes = row.get("byes", 0)
-                    existing.points = row["competitionPoints"]
-                    existing.percentage = row["alternatePercentage"]
-                    existing.synced_at = synced_at
+                    for k, v in vals.items():
+                        setattr(existing, k, v)
                 else:
-                    new_entry = Ladder(
-                        grade_id=grade_id,
-                        grade_name=grade_name,
+                    db.add(Ladder(
+                        team_id=row["team"]["id"],
                         season=season,
                         round_id=round_id,
-                        round_name=round_name,
-                        team_id=row["team"]["id"],
-                        team_name=row["team"]["name"],
-                        rank=idx,
-                        played=row["played"],
-                        wins=row["won"],
-                        losses=row["lost"],
-                        draws=row["drawn"],
-                        byes=row.get("byes", 0),
-                        points=row["competitionPoints"],
-                        percentage=row["alternatePercentage"],
-                        synced_at=synced_at
-                    )
-                    db.add(new_entry)
+                        **vals
+                    ))
+
+        # Update last_synced_at in leagues table
+        league = db.query(League).filter_by(grade_id=grade_id).first()
+        if league:
+            league.last_synced_at = synced_at
 
         db.commit()
-        st.success("✅ Ladder data synced successfully!")
+        return True
     except Exception as e:
         db.rollback()
-        st.error(f"Database error: {e}")
+        if not silent:
+            st.error(f"Database error: {e}")
+        return False
     finally:
         db.close()
+
+def sync_all_leagues(silent=False):
+    """Sync all enabled leagues. Called by cron or admin manually."""
+    db = get_db()
+    try:
+        leagues = db.query(League).filter_by(sync_enabled=1).all()
+        results = []
+        for league in leagues:
+            ok = sync_ladder(league.grade_id, league.grade_name, league.season, silent=silent)
+            results.append((league.grade_name, ok))
+        return results
+    finally:
+        db.close()
+
+# --------------------------------------------------
+# AUTH
+# --------------------------------------------------
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_login(username, password):
+    db = get_db()
+    try:
+        user = db.query(User).filter_by(
+            username=username,
+            password_hash=hash_password(password)
+        ).first()
+        if user:
+            return {"id": user.id, "username": user.username, "role": user.role}
+        return None
+    finally:
+        db.close()
+
+def is_admin():
+    return st.session_state.get("user", {}).get("role") == "admin"
+
+# --------------------------------------------------
+# CSS
+# --------------------------------------------------
+st.markdown("""
+<style>
+    .stApp { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    h1, h2, h3 { color: white !important; text-shadow: 2px 2px 4px rgba(0,0,0,0.2); }
+    section[data-testid="stSidebar"] { background: linear-gradient(180deg, #1e293b 0%, #334155 100%); }
+    section[data-testid="stSidebar"] * { color: white !important; }
+    .stDataFrame { background: white; border-radius: 12px; padding: 1rem; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+    .stButton>button { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; padding: 0.75rem 2rem; border-radius: 12px; font-weight: 600; }
+    div[data-testid="metric-container"] { background: white; padding: 1.5rem; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .league-card { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 0.5rem; }
+</style>
+""", unsafe_allow_html=True)
 
 # --------------------------------------------------
 # LOGIN PAGE
 # --------------------------------------------------
 def login_page():
-    st.markdown("<h1 style='text-align: center;'>🏈 League Info Login</h1>", unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        st.markdown("""
-        <div style='background: rgba(255, 255, 255, 0.95); 
-                    padding: 2rem; 
-                    border-radius: 16px; 
-                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);'>
-        """, unsafe_allow_html=True)
-        
+    st.markdown("<h1 style='text-align:center;'>🏈 League Info Login</h1>", unsafe_allow_html=True)
+    _, col, _ = st.columns([1, 2, 1])
+    with col:
         st.markdown("### 🔐 Sign In")
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        username = st.text_input("👤 Username", placeholder="Enter username")
-        password = st.text_input("🔒 Password", type="password", placeholder="Enter password")
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-
+        username = st.text_input("👤 Username")
+        password = st.text_input("🔒 Password", type="password")
         if st.button("🚀 Login", use_container_width=True, type="primary"):
             if username and password:
                 user = verify_login(username, password)
                 if user:
                     st.session_state.logged_in = True
                     st.session_state.user = user
-                    st.success(f"✅ Welcome, {user['username']}!")
                     st.rerun()
                 else:
                     st.error("❌ Invalid credentials")
             else:
-                st.warning("⚠️ Please enter both username and password")
-        
-        st.markdown("</div>", unsafe_allow_html=True)
+                st.warning("⚠️ Enter both fields")
 
-def logout():
-    st.session_state.logged_in = False
-    st.session_state.user = None
-    st.rerun()
+# --------------------------------------------------
+# SIDEBAR — LEAGUE MANAGEMENT (admin only)
+# --------------------------------------------------
+def sidebar_league_manager():
+    with st.sidebar:
+        st.markdown(f"### 👤 {st.session_state.user['username']} ({st.session_state.user['role'].upper()})")
+        if st.button("🚪 Logout", use_container_width=True):
+            st.session_state.logged_in = False
+            st.session_state.user = None
+            st.rerun()
+
+        st.divider()
+
+        if is_admin():
+            st.markdown("### ➕ Add League")
+            new_url = st.text_input("PlayHQ Grade URL", placeholder="https://www.playhq.com/.../grade/abc123")
+            if st.button("Add & Sync", use_container_width=True, type="primary"):
+                grade_id = extract_grade_id(new_url)
+                if not grade_id:
+                    st.error("Invalid URL")
+                else:
+                    meta = fetch_grade_meta(grade_id)
+                    if not meta:
+                        st.error("Could not fetch league info")
+                    else:
+                        db = get_db()
+                        try:
+                            existing = db.query(League).filter_by(grade_id=grade_id).first()
+                            if existing:
+                                st.warning("League already saved")
+                            else:
+                                db.add(League(
+                                    grade_id=grade_id,
+                                    grade_name=meta["name"],
+                                    season=meta["season"],
+                                    url=new_url,
+                                    added_by=st.session_state.user["username"],
+                                    added_at=datetime.utcnow().isoformat(),
+                                    sync_enabled=1
+                                ))
+                                db.commit()
+                                sync_ladder(grade_id, meta["name"], meta["season"])
+                                st.success(f"✅ Added: {meta['name']}")
+                                st.rerun()
+                        finally:
+                            db.close()
+
+            st.divider()
+            st.markdown("### 🔄 Sync All Now")
+            if st.button("Sync All Leagues", use_container_width=True):
+                with st.spinner("Syncing all leagues..."):
+                    results = sync_all_leagues()
+                for name, ok in results:
+                    if ok:
+                        st.success(f"✅ {name}")
+                    else:
+                        st.error(f"❌ {name}")
+                st.rerun()
+
+        st.divider()
+        st.markdown("### 🏆 Leagues")
+        db = get_db()
+        try:
+            leagues = db.query(League).order_by(League.grade_name).all()
+            if not leagues:
+                st.info("No leagues added yet")
+            for lg in leagues:
+                synced = lg.last_synced_at[:10] if lg.last_synced_at else "Never"
+                enabled_icon = "🟢" if lg.sync_enabled else "🔴"
+                st.markdown(
+                    f"<div class='league-card'>"
+                    f"<strong>{enabled_icon} {lg.grade_name}</strong><br>"
+                    f"<small>{lg.season} · Synced: {synced}</small>"
+                    f"</div>",
+                    unsafe_allow_html=True
+                )
+                if is_admin():
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        toggle_label = "Disable" if lg.sync_enabled else "Enable"
+                        if st.button(toggle_label, key=f"toggle_{lg.id}"):
+                            db2 = get_db()
+                            try:
+                                l2 = db2.query(League).get(lg.id)
+                                l2.sync_enabled = 0 if l2.sync_enabled else 1
+                                db2.commit()
+                            finally:
+                                db2.close()
+                            st.rerun()
+                    with col2:
+                        if st.button("🗑️ Remove", key=f"del_{lg.id}"):
+                            db2 = get_db()
+                            try:
+                                db2.query(League).filter_by(id=lg.id).delete()
+                                db2.commit()
+                            finally:
+                                db2.close()
+                            st.rerun()
+        finally:
+            db.close()
 
 # --------------------------------------------------
 # MAIN APP
 # --------------------------------------------------
 def main_app():
-    col1, col2 = st.columns([4, 1])
-    with col1:
-        st.markdown("# 🏈 League Info & Ladder")
-        st.markdown(f"Welcome back, **{st.session_state.user['username']}**! 👋")
-    with col2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🚪 Logout", use_container_width=True):
-            logout()
+    sidebar_league_manager()
 
+    st.markdown("# 🏈 League Ladders")
+    st.markdown(f"Welcome back, **{st.session_state.user['username']}**! 👋")
     st.divider()
 
-    with st.sidebar:
-        st.markdown("### 👤 User Profile")
-        st.markdown(f"**Name:** {st.session_state.user['username']}")
-        st.markdown(f"**Role:** {st.session_state.user['role'].upper()}")
-        st.divider()
+    db = get_db()
+    try:
+        leagues = db.query(League).order_by(League.grade_name).all()
+    finally:
+        db.close()
 
-        st.markdown("### 🔗 PlayHQ League Link")
-        league_url = st.text_input(
-            "Paste PlayHQ grade URL",
-            placeholder="https://www.playhq.com/.../grade/566e0601",
-            help="Paste the full URL of a PlayHQ grade/competition page"
-        )
+    if not leagues:
+        st.info("🔗 No leagues configured yet. Ask an admin to add leagues via the sidebar.")
+        return
 
-        grade_id = extract_grade_id(league_url) if league_url else None
-        
-        if grade_id:
-            st.success(f"✅ Grade ID: `{grade_id}`")
-            
-            st.divider()
-            
-            if st.button("🔄 Sync League Data", use_container_width=True, type="primary"):
-                with st.spinner("Syncing league ladder from PlayHQ..."):
-                    meta = fetch_grade_meta(grade_id)
-                    if not meta:
-                        st.error("❌ Failed to fetch league metadata")
-                        return
-                    
-                    sync_ladder(meta["id"], meta["name"], meta["season"])
-                    st.rerun()
-        else:
-            if league_url:
-                st.error("❌ Invalid PlayHQ URL")
+    # Tab per league
+    tab_labels = [f"🏆 {lg.grade_name}" for lg in leagues]
+    tabs = st.tabs(tab_labels)
 
-    st.markdown("## 🏆 League Ladder")
+    for tab, league in zip(tabs, leagues):
+        with tab:
+            db = get_db()
+            try:
+                results = db.query(
+                    Ladder.rank,
+                    Ladder.team_name,
+                    Ladder.played,
+                    Ladder.points,
+                    Ladder.percentage,
+                    Ladder.wins,
+                    Ladder.losses,
+                    Ladder.draws,
+                    Ladder.byes
+                ).filter_by(grade_id=league.grade_id)\
+                 .order_by(Ladder.rank).all()
 
-    if grade_id:
-        db = get_db()
-        try:
-            results = db.query(
-                Ladder.rank,
-                Ladder.team_name,
-                Ladder.played,
-                Ladder.points,
-                Ladder.percentage,
-                Ladder.wins,
-                Ladder.losses,
-                Ladder.draws,
-                Ladder.byes
-            ).filter_by(grade_id=grade_id)\
-             .order_by(Ladder.rank).all()
-
-            if results:
-                df = pd.DataFrame(results, columns=[
-                    "Rank", "Team", "P", "PTS", "%", "W", "L", "D", "BYE"
-                ])
-                
-                meta_info = db.query(Ladder).filter_by(grade_id=grade_id).first()
-                if meta_info:
+                if results:
                     col1, col2, col3 = st.columns(3)
-                    col1.metric("🏆 Competition", meta_info.grade_name)
-                    col2.metric("📅 Season", meta_info.season)
-                    col3.metric("🔄 Last Synced", meta_info.synced_at[:10] if meta_info.synced_at else "N/A")
-                    
+                    col1.metric("🏆 Competition", league.grade_name)
+                    col2.metric("📅 Season", league.season)
+                    synced = league.last_synced_at[:10] if league.last_synced_at else "Never"
+                    col3.metric("🔄 Last Synced", synced)
+
                     st.markdown("<br>", unsafe_allow_html=True)
-                
-                st.dataframe(
-                    df,
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config={
-                        "Rank": st.column_config.NumberColumn("Rank", width="small"),
-                        "Team": st.column_config.TextColumn("Team", width="large"),
-                        "P": st.column_config.NumberColumn("P", width="small"),
-                        "PTS": st.column_config.NumberColumn("PTS", width="small"),
-                        "%": st.column_config.NumberColumn("%", format="%.2f", width="small"),
-                        "W": st.column_config.NumberColumn("W", width="small"),
-                        "L": st.column_config.NumberColumn("L", width="small"),
-                        "D": st.column_config.NumberColumn("D", width="small"),
-                        "BYE": st.column_config.NumberColumn("BYE", width="small")
-                    }
-                )
-                
-                st.caption(f"📊 Showing {len(df)} teams")
-            else:
-                st.info("📭 No ladder data found. Click **Sync League Data** in the sidebar to load.")
-        finally:
-            db.close()
-    else:
-        st.info("🔗 Paste a PlayHQ league link in the sidebar to load ladder data.")
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        with st.expander("📖 How to Use"):
-            st.markdown("""
-            ### Steps:
-            1. Go to PlayHQ website and find your league/grade
-            2. Copy the full URL from the browser
-            3. Paste it in the sidebar
-            4. Click **Sync League Data**
-            5. View the ladder table below!
-            
-            ### Example URL:
-```
-            https://www.playhq.com/afl/org/adelaide-footy-league/summer-2025/grade/566e0601
-```
-            """)
+
+                    df = pd.DataFrame(results, columns=["Rank", "Team", "P", "PTS", "%", "W", "L", "D", "BYE"])
+                    st.dataframe(
+                        df,
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config={
+                            "Rank": st.column_config.NumberColumn("Rank", width="small"),
+                            "Team": st.column_config.TextColumn("Team", width="large"),
+                            "P":    st.column_config.NumberColumn("P",    width="small"),
+                            "PTS":  st.column_config.NumberColumn("PTS",  width="small"),
+                            "%":    st.column_config.NumberColumn("%",    format="%.2f", width="small"),
+                            "W":    st.column_config.NumberColumn("W",    width="small"),
+                            "L":    st.column_config.NumberColumn("L",    width="small"),
+                            "D":    st.column_config.NumberColumn("D",    width="small"),
+                            "BYE":  st.column_config.NumberColumn("BYE",  width="small"),
+                        }
+                    )
+                    st.caption(f"📊 {len(df)} teams")
+                else:
+                    st.info("No ladder data yet. Click **Sync All Leagues** in the sidebar.")
+            finally:
+                db.close()
+
+# --------------------------------------------------
+# CRON ENDPOINT — call via Render Cron Job
+# --------------------------------------------------
+# Render Cron Jobs run a command, not an HTTP request.
+# Add this to render.yaml as a separate cron service that runs:
+#   python sync_cron.py
+# (see sync_cron.py below)
 
 # --------------------------------------------------
 # RUN
