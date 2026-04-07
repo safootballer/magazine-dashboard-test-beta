@@ -13,42 +13,72 @@ st.set_page_config(
 )
 
 # --------------------------------------------------
-# Custom CSS
+# Custom CSS  — Brand colours: #2ca3ee / #00b8f1 / #e6fe00 / #000000 / #ffffff
 # --------------------------------------------------
 st.markdown("""
 <style>
+    /* ── Background: black → dark navy (matches SAFie app) ── */
     .stApp {
-        background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+        background: linear-gradient(160deg, #000000 0%, #0a1a2e 35%, #0d2b4e 70%, #0e3460 100%);
     }
     .block-container {
         padding-top: 3rem;
         padding-bottom: 3rem;
     }
+
+    /* ── Logo / header ── */
     .logo-container {
         text-align: center;
-        margin-bottom: 2rem;
+        margin-bottom: 1.5rem;
         animation: fadeIn 1s ease-in;
     }
     .main-title {
         text-align: center;
-        color: #ffffff;
-        font-size: 3.5rem;
+        color: #2ca3ee;
+        font-size: 3rem;
         font-weight: 900;
-        margin: 2rem 0 1rem 0;
-        text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
-        letter-spacing: 2px;
+        margin: 1.5rem 0 0.5rem 0;
+        text-shadow: 0 4px 20px rgba(44,163,238,0.4);
+        letter-spacing: 3px;
         animation: slideDown 0.8s ease-out;
     }
     .subtitle {
         text-align: center;
-        color: #94a3b8;
-        font-size: 1.3rem;
+        color: rgba(255,255,255,0.5);
+        font-size: 1.1rem;
         font-weight: 400;
-        margin-bottom: 3rem;
+        margin-bottom: 2.5rem;
+        letter-spacing: 0.1em;
         animation: slideDown 1s ease-out;
     }
 
-    /* ── Entire card is the clickable anchor ── */
+    /* ── Stats bar ── */
+    .stats-bar {
+        display: flex;
+        justify-content: center;
+        gap: 3rem;
+        margin: 2rem 0;
+        padding: 1.5rem 2rem;
+        background: #000000;
+        border-radius: 14px;
+        border: 1px solid rgba(44,163,238,0.25);
+    }
+    .stat-item { text-align: center; }
+    .stat-number {
+        font-size: 2.4rem;
+        font-weight: 900;
+        color: #e6fe00;
+        text-shadow: 0 2px 8px rgba(230,254,0,0.3);
+    }
+    .stat-label {
+        font-size: 0.85rem;
+        color: rgba(255,255,255,0.45);
+        margin-top: 0.25rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    /* ── Card link wrapper ── */
     a.card-link {
         text-decoration: none !important;
         display: block;
@@ -56,16 +86,16 @@ st.markdown("""
     }
     a.card-link:hover { text-decoration: none !important; }
 
+    /* ── Service cards ── */
     .service-card {
-        background: linear-gradient(145deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
-        backdrop-filter: blur(10px);
-        border-radius: 20px;
-        padding: 2.5rem 2rem;
+        background: #000000;
+        border-radius: 18px;
+        padding: 2.2rem 1.8rem;
         text-align: center;
-        border: 2px solid rgba(255,255,255,0.1);
-        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-        min-height: 380px;
+        border: 2px solid rgba(44,163,238,0.25);
+        transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        min-height: 400px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
@@ -73,109 +103,139 @@ st.markdown("""
     }
     .service-card:hover {
         transform: translateY(-10px);
-        border-color: rgba(59, 130, 246, 0.5);
-        box-shadow: 0 20px 60px rgba(59, 130, 246, 0.4);
-        background: linear-gradient(145deg, rgba(59,130,246,0.2), rgba(37,99,235,0.1));
+        border-color: #2ca3ee;
+        box-shadow: 0 20px 60px rgba(44,163,238,0.3);
+        background: #000000;
     }
+
+    /* SAFie card gets yellow accent on hover */
+    .service-card.safire-card:hover {
+        border-color: #e6fe00;
+        box-shadow: 0 20px 60px rgba(230,254,0,0.2);
+    }
+
     .service-icon {
         font-size: 4rem;
-        margin-bottom: 1.5rem;
-        filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+        margin-bottom: 1.2rem;
+        filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4));
+    }
+    .service-logo {
+        width: 110px;
+        height: 110px;
+        object-fit: contain;
+        margin: 0 auto 1.2rem auto;
+        display: block;
+        filter: drop-shadow(0 4px 12px rgba(44,163,238,0.4));
     }
     .service-title {
         color: #ffffff;
-        font-size: 1.8rem;
-        font-weight: 700;
-        margin-bottom: 1rem;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        font-size: 1.7rem;
+        font-weight: 800;
+        margin-bottom: 0.75rem;
+        letter-spacing: 0.02em;
     }
+    /* SAFie title in brand blue */
+    .service-title.safire-title { color: #2ca3ee; }
+
     .service-description {
-        color: #cbd5e1;
-        font-size: 1rem;
-        line-height: 1.6;
-        margin-bottom: 2rem;
+        color: rgba(255,255,255,0.6);
+        font-size: 0.95rem;
+        line-height: 1.65;
+        margin-bottom: 1.5rem;
         min-height: 60px;
     }
 
-    /* Badge — unique colour per service */
+    /* ── Badges ── */
     .badge {
         display: inline-block;
         color: white;
-        padding: 0.4rem 1rem;
+        padding: 0.35rem 1rem;
         border-radius: 20px;
-        font-size: 0.85rem;
-        font-weight: 600;
+        font-size: 0.78rem;
+        font-weight: 700;
         margin-bottom: 1.5rem;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
     }
-    .badge-core  { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
-    .badge-admin { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
-    .badge-stats { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+    /* SAFie badge — yellow/black */
+    .badge-safire {
+        background: #e6fe00;
+        color: #000000 !important;
+    }
+    /* Admin — blue */
+    .badge-admin {
+        background: linear-gradient(135deg, #2ca3ee 0%, #00b8f1 100%);
+    }
+    /* Stats — yellow outline */
+    .badge-stats {
+        background: transparent;
+        border: 2px solid #e6fe00;
+        color: #e6fe00 !important;
+    }
 
-    /* Launch button inside the card */
+    /* ── Launch buttons ── */
     .launch-btn {
         display: inline-block;
         width: 100%;
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-        color: white !important;
-        text-decoration: none !important;
-        padding: 0.9rem 2.5rem;
+        padding: 0.9rem 2rem;
         border-radius: 50px;
-        font-weight: 700;
-        font-size: 1.05rem;
+        font-weight: 800;
+        font-size: 1rem;
         transition: all 0.3s ease;
-        box-shadow: 0 6px 20px rgba(59,130,246,0.4);
         text-transform: uppercase;
         letter-spacing: 1px;
         box-sizing: border-box;
-    }
-    .launch-btn:hover {
-        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-        box-shadow: 0 10px 30px rgba(59,130,246,0.6);
-        color: white !important;
         text-decoration: none !important;
     }
-
-    /* Stats bar */
-    .stats-bar {
-        display: flex;
-        justify-content: center;
-        gap: 3rem;
-        margin: 3rem 0;
-        padding: 2rem;
-        background: rgba(255,255,255,0.05);
-        border-radius: 15px;
-        backdrop-filter: blur(10px);
+    /* SAFie button — yellow/black */
+    .launch-btn-safire {
+        background: #e6fe00;
+        color: #000000 !important;
+        box-shadow: 0 6px 24px rgba(230,254,0,0.3);
     }
-    .stat-item { text-align: center; }
-    .stat-number {
-        font-size: 2.5rem;
-        font-weight: 800;
-        color: #3b82f6;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    .launch-btn-safire:hover {
+        background: #d4eb00;
+        box-shadow: 0 10px 36px rgba(230,254,0,0.5);
+        color: #000000 !important;
     }
-    .stat-label { font-size: 1rem; color: #94a3b8; margin-top: 0.5rem; }
+    /* Default — blue gradient */
+    .launch-btn-default {
+        background: linear-gradient(135deg, #2ca3ee 0%, #00b8f1 100%);
+        color: #ffffff !important;
+        box-shadow: 0 6px 24px rgba(44,163,238,0.35);
+    }
+    .launch-btn-default:hover {
+        background: linear-gradient(135deg, #00b8f1 0%, #2ca3ee 100%);
+        box-shadow: 0 10px 36px rgba(44,163,238,0.55);
+        color: #ffffff !important;
+    }
 
-    /* Quick-access links */
+    /* ── Quick-access links ── */
     .quick-link {
-        color: #60a5fa !important;
+        color: #2ca3ee !important;
         text-decoration: none !important;
-        font-weight: 600;
-        font-size: 1rem;
+        font-weight: 700;
+        font-size: 0.95rem;
         transition: color 0.2s ease;
     }
-    .quick-link:hover { color: #93c5fd !important; text-decoration: underline !important; }
+    .quick-link:hover { color: #00b8f1 !important; text-decoration: underline !important; }
 
+    /* ── Divider ── */
+    hr { border-color: rgba(44,163,238,0.25) !important; }
+
+    /* ── Footer ── */
     .footer {
         text-align: center;
-        color: #64748b;
-        font-size: 0.9rem;
+        color: rgba(255,255,255,0.3);
+        font-size: 0.85rem;
         margin-top: 4rem;
         padding: 2rem 0;
-        border-top: 1px solid rgba(255,255,255,0.1);
+        border-top: 1px solid rgba(44,163,238,0.2);
     }
+    .footer strong { color: #2ca3ee; }
 
-    @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+    /* ── Animations ── */
+    @keyframes fadeIn    { from { opacity:0 } to { opacity:1 } }
     @keyframes slideDown {
         from { opacity:0; transform:translateY(-30px) }
         to   { opacity:1; transform:translateY(0) }
@@ -192,31 +252,49 @@ st.markdown("""
 # --------------------------------------------------
 SERVICES = [
     {
-        "key":         "magazine",
-        "name":        "Magazine Automation",
-        "icon":        "📰",
-        "description": "AI-powered match report generation for magazines, web articles, and social media posts in seconds.",
-        "url":         "https://magazine-user.onrender.com",
-        "badge":       "Core",
-        "badge_class": "badge-core",
+        "key":          "safire",
+        "name":         "SAFie",
+        "tagline":      "AI by SA Footballer",
+        "icon":         "📰",
+        "use_logo":     True,          # show assets/logo2.png instead of emoji
+        "logo_path":    "assets/logo2.png",
+        "description":  "AI-powered match report generation for magazines, web articles, and social media posts in seconds.",
+        "url":          "https://magazine-user.onrender.com",
+        "badge":        "AI · Core",
+        "badge_class":  "badge-safire",
+        "btn_class":    "launch-btn-safire",
+        "card_class":   "service-card safire-card",
+        "title_class":  "service-title safire-title",
     },
     {
-        "key":         "admin",
-        "name":        "Admin Dashboard",
-        "icon":        "⚙️",
-        "description": "Complete analytics, user management, cost tracking, match links, and full system administration.",
-        "url":         "https://magazine-admin.onrender.com",
-        "badge":       "Admin",
-        "badge_class": "badge-admin",
+        "key":          "admin",
+        "name":         "Admin Dashboard",
+        "tagline":      "",
+        "icon":         "⚙️",
+        "use_logo":     False,
+        "logo_path":    "",
+        "description":  "Complete analytics, user management, cost tracking, match links, and full system administration.",
+        "url":          "https://magazine-admin.onrender.com",
+        "badge":        "Admin",
+        "badge_class":  "badge-admin",
+        "btn_class":    "launch-btn-default",
+        "card_class":   "service-card",
+        "title_class":  "service-title",
     },
     {
-        "key":         "league",
-        "name":        "League & Ladder",
-        "icon":        "🏆",
-        "description": "Sync and display live league ladders, standings, and team statistics directly from PlayHQ.",
-        "url":         "https://ladder-hu0e.onrender.com",
-        "badge":       "Stats",
-        "badge_class": "badge-stats",
+        "key":          "league",
+        "name":         "League & Ladder",
+        "tagline":      "",
+        "icon":         "🏆",
+        "use_logo":     False,
+        "logo_path":    "",
+        "description":  "Sync and display live league ladders, standings, and team statistics directly from PlayHQ.",
+        "url":          "https://ladder-hu0e.onrender.com",
+        "badge":        "Stats",
+        "badge_class":  "badge-stats",
+        "btn_class":    "launch-btn-default",
+        "card_class":   "service-card",
+        "title_class":  "service-title",
     },
 ]
 
@@ -224,21 +302,36 @@ SERVICES = [
 # Main
 # --------------------------------------------------
 def main():
-    # Logo
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown('<div class="logo-container">', unsafe_allow_html=True)
-        logo_path = Path("assets/logo.png")
-        if logo_path.exists():
-            st.image(str(logo_path), width=250)
-        else:
-            st.markdown('<div style="font-size:5rem;text-align:center;">🏈</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown('<h1 class="main-title">SOUTH AUSTRALIAN FOOTBALLER</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="subtitle">Master Dashboard · Content Management Suite</p>', unsafe_allow_html=True)
+    # ── Dual logo header ──────────────────────────────────────────
+    col_l, col_m, col_r = st.columns([1, 2, 1])
+    with col_l:
+        try:
+            st.image("assets/logo2.png", width=130)   # SAFie logo
+        except Exception:
+            st.markdown("<p style='color:#2ca3ee;text-align:center;font-weight:700;'>SAFie</p>", unsafe_allow_html=True)
+    with col_m:
+        st.markdown("""
+        <div style="text-align:center; padding-top:10px;">
+            <h1 style="margin:0; font-size:2.4rem; font-weight:900; color:#2ca3ee; letter-spacing:3px;">
+                SOUTH AUSTRALIAN FOOTBALLER
+            </h1>
+            <span style="display:inline-block; background:#e6fe00; color:#000; font-size:0.72rem;
+                         font-weight:700; letter-spacing:0.1em; text-transform:uppercase;
+                         border-radius:20px; padding:3px 16px; margin-top:8px;">
+                Master Dashboard
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_r:
+        try:
+            st.image("assets/logo.png", width=130)    # SA Footballer logo
+        except Exception:
+            st.markdown("<p style='color:white;text-align:center;font-weight:700;'>SA Footballer</p>", unsafe_allow_html=True)
 
-    # Stats bar
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Stats bar ────────────────────────────────────────────────
     st.markdown("""
     <div class="stats-bar">
         <div class="stat-item">
@@ -258,54 +351,89 @@ def main():
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Service cards – entire card is an <a target="_blank"> ──────────────────
+    # ── Service cards ─────────────────────────────────────────────
     cols = st.columns(3)
-    for idx, service in enumerate(SERVICES):
+    for idx, svc in enumerate(SERVICES):
         with cols[idx]:
+            # Build the logo/icon HTML
+            logo_html = ""
+            if svc["use_logo"]:
+                logo_path = Path(svc["logo_path"])
+                if logo_path.exists():
+                    import base64
+                    with open(logo_path, "rb") as f:
+                        b64 = base64.b64encode(f.read()).decode()
+                    ext = logo_path.suffix.lstrip(".")
+                    logo_html = f'<img src="data:image/{ext};base64,{b64}" class="service-logo" alt="{svc["name"]} logo" />'
+                else:
+                    logo_html = f'<div class="service-icon">{svc["icon"]}</div>'
+            else:
+                logo_html = f'<div class="service-icon">{svc["icon"]}</div>'
+
+            # Optional tagline under title
+            tagline_html = ""
+            if svc["tagline"]:
+                tagline_html = f'<div style="color:#e6fe00; font-size:0.72rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; margin-top:-6px; margin-bottom:10px;">{svc["tagline"]}</div>'
+
             st.markdown(f"""
-            <a class="card-link" href="{service['url']}" target="_blank" rel="noopener noreferrer">
-                <div class="service-card">
+            <a class="card-link" href="{svc['url']}" target="_blank" rel="noopener noreferrer">
+                <div class="{svc['card_class']}">
                     <div>
-                        <div class="service-icon">{service['icon']}</div>
-                        <div class="service-title">{service['name']}</div>
-                        <div class="service-description">{service['description']}</div>
-                        <span class="badge {service['badge_class']}">{service['badge']}</span>
+                        {logo_html}
+                        <div class="{svc['title_class']}">{svc['name']}</div>
+                        {tagline_html}
+                        <div class="service-description">{svc['description']}</div>
+                        <span class="badge {svc['badge_class']}">{svc['badge']}</span>
                     </div>
                     <div style="margin-top:1.5rem;">
-                        <span class="launch-btn">🚀 Launch {service['name']}</span>
+                        <span class="launch-btn {svc['btn_class']}">🚀 Launch {svc['name']}</span>
                     </div>
                 </div>
             </a>
             """, unsafe_allow_html=True)
 
-    # ── Quick-access links (also new tab) ───────────────────────────────────────
+    # ── Quick-access links ────────────────────────────────────────
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.divider()
-    st.markdown("### 🔗 Quick Access Links")
+    st.markdown(
+        "<h3 style='color:#2ca3ee; border-bottom:3px solid #2ca3ee; padding-bottom:6px; display:inline-block;'>🔗 Quick Access Links</h3>",
+        unsafe_allow_html=True
+    )
     st.markdown("<br>", unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns(3)
-    for col, service in zip([col1, col2, col3], SERVICES):
+    for col, svc in zip([col1, col2, col3], SERVICES):
         with col:
+            title_colour = "#2ca3ee" if svc["key"] == "safire" else "#ffffff"
             st.markdown(f"""
-            <p style='color:white; font-weight:700; font-size:1.1rem;'>{service['icon']} {service['name']}</p>
-            <a href="{service['url']}" target="_blank" rel="noopener noreferrer" class="quick-link">
+            <p style='color:{title_colour}; font-weight:800; font-size:1.05rem; margin-bottom:4px;'>
+                {svc['icon']} {svc['name']}
+            </p>
+            <a href="{svc['url']}" target="_blank" rel="noopener noreferrer" class="quick-link">
                 Open in New Tab →
             </a>
-            <p style='color:#94a3b8; font-size:0.9rem; margin-top:0.5rem;'>{service['description'][:65]}…</p>
+            <p style='color:rgba(255,255,255,0.45); font-size:0.85rem; margin-top:0.5rem;'>
+                {svc['description'][:65]}…
+            </p>
             """, unsafe_allow_html=True)
 
-    # Footer
+    # ── Footer ────────────────────────────────────────────────────
     st.markdown("""
     <div class="footer">
         <p>🏈 <strong>The South Australian Footballer</strong> · Professional Sports Content Management</p>
-        <p style="margin-top:0.5rem; font-size:0.85rem;">
-            Powered by AI · Built with Streamlit · Deployed on Render 
+        <p style="margin-top:0.4rem;">
+            Powered by <span style="color:#2ca3ee; font-weight:700;">SAFie AI</span>
+            &nbsp;·&nbsp;
+            <span style="color:#e6fe00; font-weight:600;">AI by SA Footballer</span>
+            &nbsp;·&nbsp; Built with Streamlit · Deployed on Render
         </p>
-        <p style="margin-top:0.5rem; font-size:0.85rem;">
-            Developed by: Mian Talha Sarfraz (github: talha-11-11, talhasarfraz29@gmail.com, https://www.upwork.com/freelancers/~0128359f0564f06967)
+        <p style="margin-top:0.4rem; font-size:0.78rem; color:rgba(255,255,255,0.25);">
+            Developed by Mian Talha Sarfraz &nbsp;·&nbsp;
+            <a href="https://github.com/talha-11-11" style="color:#2ca3ee;">GitHub</a> &nbsp;·&nbsp;
+            <a href="mailto:talhasarfraz29@gmail.com" style="color:#2ca3ee;">talhasarfraz29@gmail.com</a> &nbsp;·&nbsp;
+            <a href="https://www.upwork.com/freelancers/~0128359f0564f06967" style="color:#2ca3ee;">Upwork</a>
         </p>
-        <p style="margin-top:1rem; font-size:0.8rem; color:#475569;">
+        <p style="margin-top:0.8rem; font-size:0.75rem; color:rgba(255,255,255,0.2);">
             © 2026 The South Australian Footballer. All rights reserved.
         </p>
     </div>
