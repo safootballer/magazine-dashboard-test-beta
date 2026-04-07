@@ -165,11 +165,11 @@ def get_db():
         raise e
 
 # --------------------------------------------------
-# Page Config
+# Page Config  ← UPDATED: SAFie branding
 # --------------------------------------------------
 st.set_page_config(
-    page_title="Sports Magazine Automation",
-    page_icon="📰",
+    page_title="SAFie | AI by SA Footballer",
+    page_icon="🏈",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -195,6 +195,20 @@ st.markdown("""
         background: rgba(255,255,255,0.15); padding: 2rem; border-radius: 16px;
         border: 2px solid rgba(255,255,255,0.3); backdrop-filter: blur(10px);
         margin: 1rem 0;
+    }
+    /* ── SAFie branding badge ── */
+    .safie-badge {
+        display: inline-block;
+        background: rgba(255,255,255,0.18);
+        border: 1px solid rgba(255,255,255,0.35);
+        border-radius: 20px;
+        padding: 4px 16px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        color: rgba(255,255,255,0.92);
+        text-transform: uppercase;
+        margin-top: 6px;
     }
     .stTextInput > div > div > input {
         background-color: #ffffff !important; color: #1e293b !important;
@@ -235,16 +249,48 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --------------------------------------------------
-# Logo
+# Logo — dual logo header  ← UPDATED
+# Displays:  [SA Footballer logo]  |  SAFie wordmark  |  [SAFie logo]
+# Falls back gracefully if either image file is missing.
 # --------------------------------------------------
 def render_logo_center():
     st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
+
+    # Three columns: left logo | centre text | right logo
+    col_left, col_mid, col_right = st.columns([1, 2, 1])
+
+    with col_left:
+        # SAFie logo — new logo on the LEFT (assets/logo2.png)
         try:
-            st.image("assets/logo.png", width=170)
-        except:
-            st.markdown("### 📰 Magazine Automation")
+            st.image("assets/logo2.png", width=150)
+        except Exception:
+            st.markdown(
+                "<p style='color:white; font-size:0.8rem; text-align:center;'>SAFie</p>",
+                unsafe_allow_html=True
+            )
+
+    with col_mid:
+        # App name + tagline centred between the two logos
+        st.markdown("""
+        <div style="text-align:center; padding-top: 12px;">
+            <h1 style="margin:0; font-size:2.6rem; font-weight:800;
+                       color:white; letter-spacing:-0.02em; line-height:1.1;">
+                SAFie
+            </h1>
+            <span class="safie-badge">AI by SA Footballer</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_right:
+        # SA Footballer logo — existing logo on the RIGHT (assets/logo.png)
+        try:
+            st.image("assets/logo.png", width=150)
+        except Exception:
+            st.markdown(
+                "<p style='color:white; font-size:0.8rem; text-align:center;'>SA Footballer</p>",
+                unsafe_allow_html=True
+            )
+
     st.markdown('<div style="margin-bottom: 20px;"></div>', unsafe_allow_html=True)
 
 render_logo_center()
@@ -294,13 +340,13 @@ def verify_login(username, password):
         db.close()
 
 # --------------------------------------------------
-# Login Page
+# Login Page  ← UPDATED: SAFie branding
 # --------------------------------------------------
 def login_page():
     st.markdown('<div class="main-header">', unsafe_allow_html=True)
-    st.markdown("# 📰")
-    st.markdown('<h1 style="margin: 0; font-size: 3rem; color: white;">Sports Magazine Automation</h1>', unsafe_allow_html=True)
-    st.markdown('<p style="font-size: 1.2rem; margin-top: 0.5rem; color: white;">AI-Powered Match Report Generation</p>', unsafe_allow_html=True)
+    st.markdown('<h1 style="margin: 0; font-size: 3rem; color: white; font-weight: 800;">SAFie</h1>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size: 1.2rem; margin-top: 0.4rem; color: white; opacity: 0.9;">AI by SA Footballer</p>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size: 0.95rem; margin-top: 0.2rem; color: rgba(255,255,255,0.7);">AI-Powered Match Report Generation</p>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -541,7 +587,7 @@ def build_match_knowledge(match: dict) -> str:
     margin = abs(fs_home - fs_away)
     hq = match["period_scores"]["home"]
     aq = match["period_scores"]["away"]
-    competition = match["competition"]  # ← use actual competition name
+    competition = match["competition"]
     home_scorers_text = ", ".join(match["goal_scorers"]["home"]) if match["goal_scorers"]["home"] else "None"
     away_scorers_text = ", ".join(match["goal_scorers"]["away"]) if match["goal_scorers"]["away"] else "None"
     home_best_text = "Not available" if match["best_players"]["home"] is None else (", ".join(match["best_players"]["home"]) or "None")
@@ -646,8 +692,6 @@ COUNTRY_LEAGUES = {
     "Yorke Peninsula": "yorke-peninsula",
 }
 
-# Reverse map: PlayHQ competition name → country league slug
-# Used to auto-detect the country league from the match data
 PLAYHQ_TO_COUNTRY_LEAGUE = {
     "Adelaide Plains Football League": "adelaide-plains",
     "Barossa Light & Gawler Football League": "barossa",
@@ -778,17 +822,11 @@ def publish_to_sanity(title, slug, competition, excerpt, content_text, author, c
 # Facebook Publisher
 # --------------------------------------------------
 def clean_for_facebook(text):
-    """
-    Strip markdown formatting that Facebook ignores and renders as literal characters.
-    Replace common section headings with emoji equivalents that stand out in the feed.
-    """
-    # Remove bold/italic markers
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)  # **bold** → plain
-    text = re.sub(r'\*(.*?)\*',     r'\1', text)  # *italic* → plain
-    text = re.sub(r'__(.*?)__',     r'\1', text)  # __bold__ → plain
-    text = re.sub(r'_(.*?)_',       r'\1', text)  # _italic_ → plain
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*',     r'\1', text)
+    text = re.sub(r'__(.*?)__',     r'\1', text)
+    text = re.sub(r'_(.*?)_',       r'\1', text)
 
-    # Replace common headings with emoji versions
     replacements = [
         (r'(?im)^#+\s*ATTENTION[^\n]*',        '🔥 '),
         (r'(?im)^#+\s*THE STORY[^\n]*',        '📖 THE STORY'),
@@ -800,22 +838,16 @@ def clean_for_facebook(text):
         (r'(?im)^#+\s*THE STATS[^\n]*',        '📊 THE STATS'),
         (r'(?im)^#+\s*WHAT IT MEANS[^\n]*',    '🏆 WHAT IT MEANS'),
         (r'(?im)^#+\s*HEADLINE[^\n]*',         ''),
-        (r'(?im)^#+\s*',                        ''),  # any remaining # headings
+        (r'(?im)^#+\s*',                        ''),
     ]
     for pattern, replacement in replacements:
         text = re.sub(pattern, replacement, text)
 
-    # Clean up excessive blank lines (max 2 newlines in a row)
     text = re.sub(r'\n{3,}', '\n\n', text)
-
     return text.strip()
 
 
 def post_to_facebook(message, image_bytes=None, image_name=None):
-    """Post a message (with optional photo) to the configured Facebook Page.
-    Photos are uploaded unpublished first then attached to a feed post
-    so they appear in the main feed on both desktop and mobile.
-    """
     page_id    = os.getenv("FACEBOOK_PAGE_ID") or st.secrets.get("FACEBOOK_PAGE_ID", "")
     page_token = os.getenv("FACEBOOK_PAGE_TOKEN") or st.secrets.get("FACEBOOK_PAGE_TOKEN", "")
 
@@ -824,8 +856,6 @@ def post_to_facebook(message, image_bytes=None, image_name=None):
 
     try:
         if image_bytes:
-            # Step 1 — Upload photo as unpublished (no_story=true)
-            # This stages the photo without creating a separate photo post
             upload_url = f"https://graph.facebook.com/v19.0/{page_id}/photos"
             files      = {"source": (image_name or "photo.jpg", image_bytes, "image/jpeg")}
             upload_data = {
@@ -842,8 +872,6 @@ def post_to_facebook(message, image_bytes=None, image_name=None):
 
             photo_id = upload_result["id"]
 
-            # Step 2 — Create feed post with photo attached
-            # This appears in the main Page feed on both desktop and mobile
             feed_url  = f"https://graph.facebook.com/v19.0/{page_id}/feed"
             feed_data = {
                 "message":           message,
@@ -853,7 +881,6 @@ def post_to_facebook(message, image_bytes=None, image_name=None):
             resp = requests.post(feed_url, data=feed_data, timeout=15)
 
         else:
-            # Text only — post directly to feed
             url  = f"https://graph.facebook.com/v19.0/{page_id}/feed"
             resp = requests.post(url, data={"message": message, "access_token": page_token}, timeout=15)
 
@@ -871,10 +898,29 @@ def post_to_facebook(message, image_bytes=None, image_name=None):
 
 
 # --------------------------------------------------
-# Main App
+# Main App  ← UPDATED: SAFie branding in sidebar & header
 # --------------------------------------------------
 def main_app():
     with st.sidebar:
+        # Sidebar dual-logo (smaller)
+        try:
+            sb_col1, sb_col2 = st.columns(2)
+            with sb_col1:
+                st.image("assets/logo2.png", width=80)
+            with sb_col2:
+                st.image("assets/logo.png", width=80)
+        except Exception:
+            st.markdown("### 🏈 SAFie")
+
+        st.markdown("""
+        <div style="text-align:center; margin: 4px 0 12px 0;">
+            <span style="color:white; font-size:1.1rem; font-weight:700;">SAFie</span><br>
+            <span style="color:rgba(255,255,255,0.65); font-size:0.72rem; letter-spacing:0.06em;">
+                AI BY SA FOOTBALLER
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+
         st.markdown("### 👤 User Profile")
         st.markdown(f"**Name:** {st.session_state.user['username']}")
         st.markdown(f"**Role:** {st.session_state.user['role'].upper()}")
@@ -903,7 +949,8 @@ def main_app():
 4. **Publish** live to website
         """)
 
-    st.markdown("# 📰 Magazine Automation")
+    # ── Main header ──────────────────────────────────────────────
+    st.markdown("# 🏈 SAFie — AI by SA Footballer")
     st.markdown(f"### Welcome back, **{st.session_state.user['username']}**! 👋")
     st.divider()
 
@@ -1043,12 +1090,10 @@ def main_app():
                 st.session_state.vectordb = InMemoryVectorStore.from_documents(chunks, OpenAIEmbeddings())
                 st.session_state.selected_match_labels = selected_labels
 
-                # Store competition info from the first match for Step 4 auto-detection
                 first_match = match_map[selected_labels[0]]
                 raw_comp = first_match.competition or "AFL"
                 st.session_state.current_competition = raw_comp
 
-                # Auto-detect if this is a Country Football league match
                 detected_league = PLAYHQ_TO_COUNTRY_LEAGUE.get(raw_comp)
                 if detected_league:
                     st.session_state.current_competition = "Country Football"
@@ -1295,7 +1340,6 @@ Write the social media long-form post now.
                 if fb_char_count > 63206:
                     st.warning(f"⚠️ Post is {fb_char_count} characters — Facebook limit is 63,206.")
 
-                # Photo upload — optional
                 st.markdown("**📷 Attach a photo (optional)**")
                 include_photo = st.radio(
                     "Include a photo?",
@@ -1341,7 +1385,6 @@ Write the social media long-form post now.
 
     # --------------------------------------------------
     # Step 4: Publish to Website
-    # Outside the vectordb block so it always renders
     # --------------------------------------------------
     if "generated_content" in st.session_state:
         st.divider()
@@ -1419,7 +1462,6 @@ Write the social media long-form post now.
 
             pub_country_league = None
             if pub_competition == "Country Football":
-                # Auto-detect league from match data if possible
                 detected = st.session_state.get("detected_country_league")
                 league_keys = list(COUNTRY_LEAGUES.keys())
                 league_values = list(COUNTRY_LEAGUES.values())
