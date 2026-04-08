@@ -36,7 +36,6 @@ class League(Base):
     sync_enabled = Column(Integer, default=1)
 
 class PlayerGame(Base):
-    """One row per player per game."""
     __tablename__ = 'player_games'
     id = Column(Integer, primary_key=True, autoincrement=True)
     grade_id = Column(String(255), index=True)
@@ -54,7 +53,7 @@ class PlayerGame(Base):
     player_number = Column(String(50))
     goals = Column(Integer, default=0)
     behinds = Column(Integer, default=0)
-    best_player_rank = Column(Integer, default=0)  # 0=not BP, 1=first, 2=second etc
+    best_player_rank = Column(Integer, default=0)
     synced_at = Column(String(255))
 
 class PlayerProfile(Base):
@@ -78,6 +77,42 @@ SessionLocal = sessionmaker(bind=engine)
 
 def get_db():
     return SessionLocal()
+
+# --------------------------------------------------
+# COPY BUTTON HELPER
+# --------------------------------------------------
+def copy_button(df: pd.DataFrame, key: str, label: str = "📋 Copy Table"):
+    """Renders a JS clipboard copy button above any DataFrame."""
+    lines = ["\t".join(str(c) for c in df.columns.tolist())]
+    for _, row in df.iterrows():
+        lines.append("\t".join("" if v is None else str(v) for v in row.tolist()))
+    tsv = "\n".join(lines).replace("\\", "\\\\").replace("`", "\\`")
+    btn_id = f"copybtn_{key}".replace("-", "_").replace(" ", "_")
+    st.markdown(f"""
+    <button id="{btn_id}" onclick="
+        navigator.clipboard.writeText(`{tsv}`).then(() => {{
+            const b = document.getElementById('{btn_id}');
+            b.innerText = '✅ Copied!';
+            b.style.background = '#10b981';
+            setTimeout(() => {{
+                b.innerText = '{label}';
+                b.style.background = '#3b82f6';
+            }}, 2000);
+        }}).catch(() => {{
+            const b = document.getElementById('{btn_id}');
+            b.innerText = '❌ Try Ctrl+C instead';
+            setTimeout(() => {{ b.innerText = '{label}'; b.style.background='#3b82f6'; }}, 2500);
+        }});
+    "
+    style="background:#3b82f6;color:white;border:none;padding:0.42rem 1.1rem;
+           border-radius:8px;font-weight:600;font-size:0.82rem;cursor:pointer;
+           margin-bottom:0.6rem;transition:background 0.3s;">
+        {label}
+    </button>
+    <span style="color:rgba(255,255,255,0.45);font-size:0.78rem;margin-left:0.5rem;">
+        Paste into Excel or Google Sheets with Ctrl+V
+    </span>
+    """, unsafe_allow_html=True)
 
 # --------------------------------------------------
 # PLAYHQ
@@ -115,10 +150,7 @@ query($gradeID: ID!) {
                 ... on DiscoverGamePermitFillInPlayer { id }
                 ... on DiscoverParticipantFillInPlayer { id }
               }
-              statistics {
-                count
-                type { value label }
-              }
+              statistics { count type { value label } }
             }
             bestPlayers {
               ranking
@@ -138,10 +170,7 @@ query($gradeID: ID!) {
                 ... on DiscoverGamePermitFillInPlayer { id }
                 ... on DiscoverParticipantFillInPlayer { id }
               }
-              statistics {
-                count
-                type { value label }
-              }
+              statistics { count type { value label } }
             }
             bestPlayers {
               ranking
@@ -182,11 +211,9 @@ def get_player_name(player_id, name_direct, db):
                                  fetched_at=datetime.utcnow().isoformat()))
             db.commit()
         return name_direct
-
     cached = db.query(PlayerProfile).filter_by(player_id=player_id).first()
     if cached:
         return cached.player_name or f"#{player_id[:6]}"
-
     data = safe_post({"query": PROFILE_QUERY, "variables": {"participantID": player_id}})
     name = None
     if data and data.get("discoverParticipant"):
@@ -194,7 +221,6 @@ def get_player_name(player_id, name_direct, db):
         fn = profile.get("firstName", "")
         ln = profile.get("lastName", "")
         name = f"{fn} {ln}".strip() or None
-
     db.add(PlayerProfile(player_id=player_id, player_name=name,
                          fetched_at=datetime.utcnow().isoformat()))
     db.commit()
@@ -206,26 +232,21 @@ def sync_grade_stats(grade_id, grade_name, season, silent=False, resolve_names=T
     if not data:
         if not silent: st.error("❌ Failed to fetch from PlayHQ")
         return False
-
     rounds = data.get("discoverGrade", {}).get("rounds", [])
     db = get_db()
     added = updated = 0
-
     try:
         for rnd in rounds:
             round_name = rnd["name"]
             round_number = rnd.get("number", 0)
-
             for game in rnd.get("games", []):
                 game_id = game["id"]
                 game_date = game.get("date", "")
                 if game.get("status", {}).get("value") not in ("FINAL", "FORFEIT"):
                     continue
-
                 home = game.get("home", {})
                 away = game.get("away", {})
                 stats = game.get("statistics", {})
-
                 for side, tid, tname, oname in [
                     ("home", home.get("id",""), home.get("name",""), away.get("name","")),
                     ("away", away.get("id",""), away.get("name",""), home.get("name","")),
@@ -233,15 +254,12 @@ def sync_grade_stats(grade_id, grade_name, season, silent=False, resolve_names=T
                     side_data = stats.get(side, {})
                     players = side_data.get("players", [])
                     best_players = side_data.get("bestPlayers", [])
-
-                    # BP map: player_id → rank
                     bp_map = {}
                     for bp in best_players:
                         part = bp.get("participant", {}) or {}
                         pid = part.get("id")
                         if pid:
                             bp_map[pid] = (bp.get("ranking", 1), part.get("name"))
-
                     for pe in players:
                         player_obj = pe.get("player", {}) or {}
                         player_id = player_obj.get("id", "")
@@ -249,50 +267,37 @@ def sync_grade_stats(grade_id, grade_name, season, silent=False, resolve_names=T
                         player_number = pe.get("playerNumber", "")
                         if not player_id:
                             continue
-
                         if resolve_names:
                             player_name = get_player_name(player_id, name_direct, db)
                         else:
                             cached = db.query(PlayerProfile).filter_by(player_id=player_id).first()
                             player_name = (cached.player_name if cached else None) or name_direct or f"#{player_number}"
-
                         goals = behinds = 0
                         for stat in pe.get("statistics", []):
                             v = stat["type"]["value"]
                             c = stat["count"]
-                            if v == "6_POINT_SCORE":
-                                goals = c
-                            elif v == "1_POINT_SCORE":
-                                behinds = c
-
+                            if v == "6_POINT_SCORE": goals = c
+                            elif v == "1_POINT_SCORE": behinds = c
                         bp_rank = bp_map.get(player_id, (0, None))[0] if player_id in bp_map else 0
-
                         existing = db.query(PlayerGame).filter_by(
-                            game_id=game_id, player_id=player_id, team_id=tid
-                        ).first()
-
+                            game_id=game_id, player_id=player_id, team_id=tid).first()
                         vals = dict(
                             grade_id=grade_id, grade_name=grade_name, season=season,
                             round_number=round_number, round_name=round_name,
                             game_date=game_date, team_id=tid, team_name=tname,
                             opponent_name=oname, player_name=player_name,
                             player_number=player_number, goals=goals, behinds=behinds,
-                            best_player_rank=bp_rank, synced_at=synced_at
-                        )
-
+                            best_player_rank=bp_rank, synced_at=synced_at)
                         if existing:
-                            for k, v in vals.items():
-                                setattr(existing, k, v)
+                            for k, v in vals.items(): setattr(existing, k, v)
                             updated += 1
                         else:
                             db.add(PlayerGame(player_id=player_id, **vals))
                             added += 1
-
         db.commit()
         if not silent:
             st.success(f"✅ {grade_name}: {added} new, {updated} updated")
         return True
-
     except Exception as e:
         db.rollback()
         if not silent: st.error(f"Database error: {e}")
@@ -364,7 +369,6 @@ def sidebar():
             st.session_state.user = None
             st.rerun()
         st.divider()
-
         if is_admin():
             st.markdown("### 🔄 Sync")
             db = get_db()
@@ -372,7 +376,6 @@ def sidebar():
                 leagues = db.query(League).filter_by(sync_enabled=1).all()
             finally:
                 db.close()
-
             if leagues:
                 if st.button("Sync All Leagues", use_container_width=True, type="primary"):
                     for lg in leagues:
@@ -386,7 +389,6 @@ def sidebar():
                         st.rerun()
             else:
                 st.info("No leagues configured in Ladder app.")
-
         st.divider()
         st.markdown("### 🏆 Leagues")
         db = get_db()
@@ -400,7 +402,7 @@ def sidebar():
             db.close()
 
 # --------------------------------------------------
-# SEASON STATS — matches PlayHQ: GP / G / BP
+# SEASON STATS
 # --------------------------------------------------
 def season_stats_view(grade_id):
     db = get_db()
@@ -427,7 +429,6 @@ def season_stats_view(grade_id):
         df = pd.DataFrame(rows, columns=["player_id","Player","Team","#","GP","G","BP"])
         df = df.drop(columns=["player_id"])
 
-        # Metrics
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("👥 Players", len(df))
         c2.metric("🏈 Teams", df["Team"].nunique())
@@ -438,7 +439,6 @@ def season_stats_view(grade_id):
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Filters
         fc1, fc2 = st.columns([3, 2])
         with fc1:
             teams = ["All Teams"] + sorted(df["Team"].dropna().unique().tolist())
@@ -451,6 +451,11 @@ def season_stats_view(grade_id):
             filtered = filtered[filtered["Team"] == sel_team]
         filtered = filtered.sort_values(sort_by, ascending=False).reset_index(drop=True)
         filtered.index += 1
+
+        # Export df includes rank number
+        export_df = filtered[["Player","Team","#","GP","G","BP"]].copy()
+        export_df.insert(0, "Rank", range(1, len(export_df)+1))
+        copy_button(export_df, key=f"season_{grade_id}")
 
         st.dataframe(
             filtered[["Player","Team","#","GP","G","BP"]],
@@ -506,13 +511,23 @@ def round_stats_view(grade_id):
         df["BP"] = (df["BP Rank"] > 0).astype(int)
         df = df.drop(columns=["BP Rank"])
 
+        # One button copies everything for the entire round
+        full_export = df[["Team","Player","#","vs","G","B","BP"]].copy()
+        copy_button(full_export, key=f"round_full_{grade_id}_{rnum}",
+                    label="📋 Copy Full Round (All Teams)")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
         for team in sorted(df["Team"].unique()):
             tdf = df[df["Team"] == team][["Player","#","vs","G","B","BP"]].copy()
             tdf = tdf.sort_values("G", ascending=False).reset_index(drop=True)
             tdf.index += 1
             total_g = int(tdf["G"].sum())
             total_bp = int(tdf["BP"].sum())
+            safe_team = team.replace(" ", "_").replace("/", "_")
             with st.expander(f"🏈 {team}  ·  {total_g}G  ·  {total_bp} BP", expanded=True):
+                copy_button(tdf, key=f"round_{grade_id}_{rnum}_{safe_team}",
+                            label=f"📋 Copy {team}")
                 st.dataframe(tdf, use_container_width=True, hide_index=False,
                     column_config={
                         "Player": st.column_config.TextColumn("Player", width="large"),
@@ -552,6 +567,9 @@ def leaderboard_view(grade_id):
             top = df.nlargest(15,"G").reset_index(drop=True)
             top.index += 1
             top["Avg G"] = (top["G"] / top["GP"].replace(0,1)).round(2)
+            export = top[["Player","Team","GP","G","Avg G"]].copy()
+            export.insert(0, "Rank", range(1, len(export)+1))
+            copy_button(export, key=f"lb_goals_{grade_id}", label="📋 Copy Goal Kickers")
             st.dataframe(top[["Player","Team","GP","G","Avg G"]], use_container_width=True,
                 column_config={
                     "Player": st.column_config.TextColumn("Player", width="large"),
@@ -564,6 +582,9 @@ def leaderboard_view(grade_id):
         with t2:
             top_bp = df[df["BP"]>0].nlargest(15,"BP").reset_index(drop=True)
             top_bp.index += 1
+            export_bp = top_bp[["Player","Team","GP","BP","G"]].copy()
+            export_bp.insert(0, "Rank", range(1, len(export_bp)+1))
+            copy_button(export_bp, key=f"lb_bp_{grade_id}", label="📋 Copy Best Players")
             st.dataframe(top_bp[["Player","Team","GP","BP","G"]], use_container_width=True,
                 column_config={
                     "Player": st.column_config.TextColumn("Player", width="large"),
