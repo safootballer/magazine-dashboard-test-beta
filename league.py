@@ -479,38 +479,33 @@ def main_app():
                         "Rank", "Team", "P", "PTS", "%", "W", "L", "D", "BYE", "F", "A", "FORF"
                     ])
 
-                    # ── Copy to clipboard button ──────────────────────────
+                    # Copy to clipboard
+                    import streamlit.components.v1 as components
                     tsv_rows = ["\t".join(df.columns.tolist())]
                     for _, row in df.iterrows():
                         tsv_rows.append("\t".join(str(v) for v in row.tolist()))
-                    tsv_data = "\n".join(tsv_rows).replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
-
-                    copy_id = f"copy_{league.grade_id}".replace("-","_")
-                    area_id = f"area_{league.grade_id}".replace("-","_")
-                    st.markdown(f"""
-                    <textarea id="{area_id}" readonly
-                        style="position:absolute;left:-9999px;top:-9999px;opacity:0;"
-                    >{tsv_data}</textarea>
-                    <button id="{copy_id}" onclick="
-                        var ta = document.getElementById('{area_id}');
-                        ta.style.position='fixed'; ta.style.left='0'; ta.style.top='0'; ta.style.opacity='1';
-                        ta.select(); ta.setSelectionRange(0, 999999);
-                        var ok = document.execCommand('copy');
-                        ta.style.position='absolute'; ta.style.left='-9999px'; ta.style.opacity='0';
-                        var b = document.getElementById('{copy_id}');
-                        if (ok) {{ b.innerText='✅ Copied!'; b.style.background='#10b981'; }}
-                        else {{ b.innerText='❌ Failed'; b.style.background='#ef4444'; }}
-                        setTimeout(function(){{ b.innerText='📋 Copy Table'; b.style.background='#3b82f6'; }}, 2000);
-                    "
-                    style="background:#3b82f6;color:white;border:none;padding:0.45rem 1.2rem;
+                    tsv_data = "\n".join(tsv_rows).replace("&","&amp;").replace('"',"&quot;").replace("<","&lt;").replace(">","&gt;")
+                    sid = league.grade_id.replace("-","_")
+                    components.html(f"""
+                    <textarea id="area_{sid}" readonly style="position:absolute;left:-9999px;top:-9999px;opacity:0;">{tsv_data}</textarea>
+                    <button id="copy_{sid}" onclick="
+                        var ta=document.getElementById('area_{sid}');
+                        ta.style.position='fixed';ta.style.left='0';ta.style.top='0';ta.style.opacity='1';
+                        ta.select();ta.setSelectionRange(0,999999);
+                        var ok=document.execCommand('copy');
+                        ta.style.position='absolute';ta.style.left='-9999px';ta.style.opacity='0';
+                        var b=document.getElementById('copy_{sid}');
+                        if(ok){{b.innerText='Copied!';b.style.background='#10b981';}}
+                        else{{b.innerText='Failed - select manually';b.style.background='#ef4444';}}
+                        setTimeout(function(){{b.innerText='Copy Table';b.style.background='#3b82f6';}},2000);
+                    " style="background:#3b82f6;color:white;border:none;padding:0.45rem 1.2rem;
                            border-radius:8px;font-weight:600;font-size:0.85rem;cursor:pointer;
-                           margin-bottom:0.75rem;transition:background 0.3s;">
-                        📋 Copy Table
+                           transition:background 0.3s;">Copy Table
                     </button>
-                    <span style="color:rgba(255,255,255,0.5);font-size:0.8rem;margin-left:0.5rem;">
+                    <span style="color:#999;font-size:0.8rem;margin-left:0.5rem;">
                         Then Ctrl+V into Excel or Google Sheets
                     </span>
-                    """, unsafe_allow_html=True)
+                    """, height=48)
 
                     st.dataframe(
                         df,
