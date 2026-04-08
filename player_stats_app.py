@@ -82,27 +82,46 @@ def get_db():
 # COPY BUTTON HELPER
 # --------------------------------------------------
 def copy_button(df: pd.DataFrame, key: str, label: str = "📋 Copy Table"):
-    """Renders a JS clipboard copy button above any DataFrame."""
+    """Renders a copy button that works inside Streamlit's iframe sandbox."""
     lines = ["\t".join(str(c) for c in df.columns.tolist())]
     for _, row in df.iterrows():
         lines.append("\t".join("" if v is None else str(v) for v in row.tolist()))
-    tsv = "\n".join(lines).replace("\\", "\\\\").replace("`", "\\`")
-    btn_id = f"copybtn_{key}".replace("-", "_").replace(" ", "_")
+    tsv = "\n".join(lines)
+    # Escape for embedding in HTML attribute
+    tsv_escaped = tsv.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+
+    safe_key = key.replace("-", "_").replace(" ", "_").replace("/", "_")
+    btn_id  = f"cb_{safe_key}"
+    area_id = f"ta_{safe_key}"
+
     st.markdown(f"""
+    <textarea id="{area_id}" readonly
+        style="position:absolute;left:-9999px;top:-9999px;opacity:0;"
+    >{tsv_escaped}</textarea>
     <button id="{btn_id}" onclick="
-        navigator.clipboard.writeText(`{tsv}`).then(() => {{
-            const b = document.getElementById('{btn_id}');
+        var ta = document.getElementById('{area_id}');
+        ta.style.position = 'fixed';
+        ta.style.left = '0';
+        ta.style.top = '0';
+        ta.style.opacity = '1';
+        ta.select();
+        ta.setSelectionRange(0, 999999);
+        var ok = document.execCommand('copy');
+        ta.style.position = 'absolute';
+        ta.style.left = '-9999px';
+        ta.style.opacity = '0';
+        var b = document.getElementById('{btn_id}');
+        if (ok) {{
             b.innerText = '✅ Copied!';
             b.style.background = '#10b981';
-            setTimeout(() => {{
-                b.innerText = '{label}';
-                b.style.background = '#3b82f6';
-            }}, 2000);
-        }}).catch(() => {{
-            const b = document.getElementById('{btn_id}');
-            b.innerText = '❌ Try Ctrl+C instead';
-            setTimeout(() => {{ b.innerText = '{label}'; b.style.background='#3b82f6'; }}, 2500);
-        }});
+        }} else {{
+            b.innerText = '❌ Failed — select table manually';
+            b.style.background = '#ef4444';
+        }}
+        setTimeout(function() {{
+            b.innerText = '{label}';
+            b.style.background = '#3b82f6';
+        }}, 2000);
     "
     style="background:#3b82f6;color:white;border:none;padding:0.42rem 1.1rem;
            border-radius:8px;font-weight:600;font-size:0.82rem;cursor:pointer;
@@ -110,7 +129,7 @@ def copy_button(df: pd.DataFrame, key: str, label: str = "📋 Copy Table"):
         {label}
     </button>
     <span style="color:rgba(255,255,255,0.45);font-size:0.78rem;margin-left:0.5rem;">
-        Paste into Excel or Google Sheets with Ctrl+V
+        Then Ctrl+V into Excel or Google Sheets
     </span>
     """, unsafe_allow_html=True)
 
