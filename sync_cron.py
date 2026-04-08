@@ -47,6 +47,7 @@ query GradeLadder($gradeID: ID!) {
       standings {
         played won lost drawn byes
         competitionPoints alternatePercentage
+        pointsFor pointsAgainst forfeits
         team { id name }
       }
     }
@@ -102,7 +103,9 @@ def sync_one(db, grade_id, grade_name, season):
                             grade_id=:gid, grade_name=:gname, round_name=:rname,
                             team_name=:tname, rank=:rank, played=:played,
                             wins=:wins, losses=:losses, draws=:draws, byes=:byes,
-                            points=:pts, percentage=:pct, synced_at=:sat
+                            points=:pts, percentage=:pct,
+                            points_for=:pf, points_against=:pa, forfeits=:forf,
+                            synced_at=:sat
                         WHERE id=:id
                     """),
                     {
@@ -111,8 +114,10 @@ def sync_one(db, grade_id, grade_name, season):
                         "played": row["played"], "wins": row["won"],
                         "losses": row["lost"], "draws": row["drawn"],
                         "byes": row.get("byes", 0), "pts": row["competitionPoints"],
-                        "pct": row["alternatePercentage"], "sat": synced_at,
-                        "id": existing[0]
+                        "pct": row["alternatePercentage"],
+                        "pf": row.get("pointsFor", 0), "pa": row.get("pointsAgainst", 0),
+                        "forf": row.get("forfeits", 0),
+                        "sat": synced_at, "id": existing[0]
                     }
                 )
                 rows_updated += 1
@@ -122,11 +127,13 @@ def sync_one(db, grade_id, grade_name, season):
                         INSERT INTO ladder
                             (grade_id, grade_name, season, round_id, round_name,
                              team_id, team_name, rank, played, wins, losses,
-                             draws, byes, points, percentage, synced_at)
+                             draws, byes, points, percentage,
+                             points_for, points_against, forfeits, synced_at)
                         VALUES
                             (:gid, :gname, :season, :rid, :rname,
                              :tid, :tname, :rank, :played, :wins, :losses,
-                             :draws, :byes, :pts, :pct, :sat)
+                             :draws, :byes, :pts, :pct,
+                             :pf, :pa, :forf, :sat)
                     """),
                     {
                         "gid": grade_id, "gname": grade_name, "season": season,
@@ -135,7 +142,9 @@ def sync_one(db, grade_id, grade_name, season):
                         "rank": idx, "played": row["played"], "wins": row["won"],
                         "losses": row["lost"], "draws": row["drawn"],
                         "byes": row.get("byes", 0), "pts": row["competitionPoints"],
-                        "pct": row["alternatePercentage"], "sat": synced_at
+                        "pct": row["alternatePercentage"],
+                        "pf": row.get("pointsFor", 0), "pa": row.get("pointsAgainst", 0),
+                        "forf": row.get("forfeits", 0), "sat": synced_at
                     }
                 )
                 rows_added += 1
