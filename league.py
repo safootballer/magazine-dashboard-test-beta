@@ -65,6 +65,9 @@ class Ladder(Base):
     byes = Column(Integer, default=0)
     points = Column(Integer)
     percentage = Column(Float)
+    points_for = Column(Integer, default=0)
+    points_against = Column(Integer, default=0)
+    forfeits = Column(Integer, default=0)
     synced_at = Column(String(255))
 
 class User(Base):
@@ -86,10 +89,20 @@ def migrate_database():
 
     if 'ladder' in inspector.get_table_names():
         existing = [c['name'] for c in inspector.get_columns('ladder')]
-        if 'byes' not in existing:
-            with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE ladder ADD COLUMN byes INTEGER DEFAULT 0"))
-                conn.commit()
+        new_cols = [
+            ("byes",           "INTEGER DEFAULT 0"),
+            ("points_for",     "INTEGER DEFAULT 0"),
+            ("points_against", "INTEGER DEFAULT 0"),
+            ("forfeits",       "INTEGER DEFAULT 0"),
+        ]
+        for col_name, col_def in new_cols:
+            if col_name not in existing:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(text(f"ALTER TABLE ladder ADD COLUMN {col_name} {col_def}"))
+                        conn.commit()
+                except Exception as e:
+                    print(f"⚠️ Could not add {col_name}: {e}")
 
 migrate_database()
 
@@ -128,6 +141,7 @@ query GradeLadder($gradeID: ID!) {
       standings {
         played won lost drawn byes
         competitionPoints alternatePercentage
+        pointsFor pointsAgainst forfeits
         team { id name }
       }
     }
@@ -202,6 +216,9 @@ def sync_ladder(grade_id, grade_name, season, silent=False):
                     byes=row.get("byes", 0),
                     points=row["competitionPoints"],
                     percentage=row["alternatePercentage"],
+                    points_for=row.get("pointsFor", 0),
+                    points_against=row.get("pointsAgainst", 0),
+                    forfeits=row.get("forfeits", 0),
                     synced_at=synced_at
                 )
 
@@ -442,7 +459,10 @@ def main_app():
                     Ladder.wins,
                     Ladder.losses,
                     Ladder.draws,
-                    Ladder.byes
+                    Ladder.byes,
+                    Ladder.points_for,
+                    Ladder.points_against,
+                    Ladder.forfeits,
                 ).filter_by(grade_id=league.grade_id)\
                  .order_by(Ladder.rank).all()
 
@@ -455,7 +475,43 @@ def main_app():
 
                     st.markdown("<br>", unsafe_allow_html=True)
 
-                    df = pd.DataFrame(results, columns=["Rank", "Team", "P", "PTS", "%", "W", "L", "D", "BYE"])
+                    df = pd.DataFrame(results, columns=[
+                        "Rank", "Team", "P", "PTS", "%", "W", "L", "D", "BYE", "F", "A", "FORF"
+                    ])
+
+                    # ── Copy to clipboard button ──────────────────────────
+                    # Build tab-separated text: headers + rows
+                    tsv_rows = ["\t".join(df.columns.tolist())]
+                    for _, row in df.iterrows():
+                        tsv_rows.append("\t".join(str(v) for v in row.tolist()))
+                    tsv_data = "\\n".join(tsv_rows).replace("`", "'").replace("\\", "\\\\")
+
+                    copy_id = f"copy_{league.grade_id}"
+                    st.markdown(f"""
+                    <button onclick="
+                        const text = `{tsv_data}`;
+                        navigator.clipboard.writeText(text.replace(/\\\\n/g, '\\n')).then(() => {{
+                            const btn = document.getElementById('{copy_id}');
+                            btn.innerText = '✅ Copied!';
+                            btn.style.background = '#10b981';
+                            setTimeout(() => {{
+                                btn.innerText = '📋 Copy Table';
+                                btn.style.background = '#3b82f6';
+                            }}, 2000);
+                        }});
+                    "
+                    id="{copy_id}"
+                    style="
+                        background:#3b82f6; color:white; border:none;
+                        padding:0.45rem 1.2rem; border-radius:8px;
+                        font-weight:600; font-size:0.85rem; cursor:pointer;
+                        margin-bottom:0.75rem; transition:background 0.3s;
+                    ">📋 Copy Table</button>
+                    <span style="color:rgba(255,255,255,0.5); font-size:0.8rem; margin-left:0.5rem;">
+                        Paste into Excel, Google Sheets, or anywhere
+                    </span>
+                    """, unsafe_allow_html=True)
+
                     st.dataframe(
                         df,
                         use_container_width=True,
@@ -470,9 +526,12 @@ def main_app():
                             "L":    st.column_config.NumberColumn("L",    width="small"),
                             "D":    st.column_config.NumberColumn("D",    width="small"),
                             "BYE":  st.column_config.NumberColumn("BYE",  width="small"),
+                            "F":    st.column_config.NumberColumn("F",    width="small", help="Points For"),
+                            "A":    st.column_config.NumberColumn("A",    width="small", help="Points Against"),
+                            "FORF": st.column_config.NumberColumn("FORF", width="small", help="Forfeits"),
                         }
                     )
-                    st.caption(f"📊 {len(df)} teams")
+                    st.caption(f"📊 {len(df)} teams  ·  Use 📋 Copy Table to paste into Excel or Google Sheets")
                 else:
                     st.info("No ladder data yet. Click **Sync All Leagues** in the sidebar.")
             finally:
