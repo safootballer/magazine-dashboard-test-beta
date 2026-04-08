@@ -81,138 +81,36 @@ def get_db():
 # --------------------------------------------------
 # COPY BUTTON HELPER
 # --------------------------------------------------
-def copy_button(df: pd.DataFrame, key: str, label: str = "📋 Copy Table"):
-    """Renders a copy button that works inside Streamlit's iframe sandbox."""
+def copy_button(df, key: str, label: str = "Copy Table"):
+    """Renders a working copy button using components.html (works inside Streamlit iframe)."""
+    import streamlit.components.v1 as components
     lines = ["\t".join(str(c) for c in df.columns.tolist())]
     for _, row in df.iterrows():
         lines.append("\t".join("" if v is None else str(v) for v in row.tolist()))
-    tsv = "\n".join(lines)
-    # Escape for embedding in HTML attribute
-    tsv_escaped = tsv.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
-
-    safe_key = key.replace("-", "_").replace(" ", "_").replace("/", "_")
+    tsv = "\n".join(lines).replace("&","&amp;").replace('"',"&quot;").replace("<","&lt;").replace(">","&gt;")
+    safe_key = key.replace("-","_").replace(" ","_").replace("/","_").replace(".","_")
     btn_id  = f"cb_{safe_key}"
     area_id = f"ta_{safe_key}"
-
-    st.markdown(f"""
-    <textarea id="{area_id}" readonly
-        style="position:absolute;left:-9999px;top:-9999px;opacity:0;"
-    >{tsv_escaped}</textarea>
+    # Strip emoji from label for JS safety
+    safe_label = label.encode('ascii', errors='ignore').decode()
+    components.html(f"""
+    <textarea id="{area_id}" readonly style="position:absolute;left:-9999px;top:-9999px;opacity:0;">{tsv}</textarea>
     <button id="{btn_id}" onclick="
-        var ta = document.getElementById('{area_id}');
-        ta.style.position = 'fixed';
-        ta.style.left = '0';
-        ta.style.top = '0';
-        ta.style.opacity = '1';
-        ta.select();
-        ta.setSelectionRange(0, 999999);
-        var ok = document.execCommand('copy');
-        ta.style.position = 'absolute';
-        ta.style.left = '-9999px';
-        ta.style.opacity = '0';
-        var b = document.getElementById('{btn_id}');
-        if (ok) {{
-            b.innerText = '✅ Copied!';
-            b.style.background = '#10b981';
-        }} else {{
-            b.innerText = '❌ Failed — select table manually';
-            b.style.background = '#ef4444';
-        }}
-        setTimeout(function() {{
-            b.innerText = '{label}';
-            b.style.background = '#3b82f6';
-        }}, 2000);
-    "
-    style="background:#3b82f6;color:white;border:none;padding:0.42rem 1.1rem;
-           border-radius:8px;font-weight:600;font-size:0.82rem;cursor:pointer;
-           margin-bottom:0.6rem;transition:background 0.3s;">
-        {label}
+        var ta=document.getElementById('{area_id}');
+        ta.style.position='fixed';ta.style.left='0';ta.style.top='0';ta.style.opacity='1';
+        ta.select();ta.setSelectionRange(0,999999);
+        var ok=document.execCommand('copy');
+        ta.style.position='absolute';ta.style.left='-9999px';ta.style.opacity='0';
+        var b=document.getElementById('{btn_id}');
+        if(ok){{b.innerText='Copied!';b.style.background='#10b981';}}
+        else{{b.innerText='Failed';b.style.background='#ef4444';}}
+        setTimeout(function(){{b.innerText='{safe_label}';b.style.background='#3b82f6';}},2000);
+    " style="background:#3b82f6;color:white;border:none;padding:0.42rem 1.1rem;
+             border-radius:8px;font-weight:600;font-size:0.82rem;cursor:pointer;
+             transition:background 0.3s;">{safe_label}
     </button>
-    <span style="color:rgba(255,255,255,0.45);font-size:0.78rem;margin-left:0.5rem;">
-        Then Ctrl+V into Excel or Google Sheets
-    </span>
-    """, unsafe_allow_html=True)
-
-# --------------------------------------------------
-# PLAYHQ
-# --------------------------------------------------
-PLAYHQ_URL = "https://api.playhq.com/graphql"
-HEADERS = {
-    "User-Agent": "Mozilla/5.0",
-    "Content-Type": "application/json",
-    "Origin": "https://www.playhq.com",
-    "Referer": "https://www.playhq.com/",
-    "tenant": "afl"
-}
-
-STATS_QUERY = """
-query($gradeID: ID!) {
-  discoverGrade(gradeID: $gradeID) {
-    rounds {
-      id
-      name
-      number
-      games {
-        id
-        date
-        status { value }
-        home { ... on DiscoverTeam { id name } }
-        away { ... on DiscoverTeam { id name } }
-        statistics {
-          home {
-            players {
-              playerNumber
-              player {
-                ... on DiscoverParticipant { id }
-                ... on DiscoverAnonymousParticipant { id name }
-                ... on DiscoverRegularFillInPlayer { id name }
-                ... on DiscoverGamePermitFillInPlayer { id }
-                ... on DiscoverParticipantFillInPlayer { id }
-              }
-              statistics { count type { value label } }
-            }
-            bestPlayers {
-              ranking
-              participant {
-                ... on DiscoverParticipant { id }
-                ... on DiscoverAnonymousParticipant { id name }
-              }
-            }
-          }
-          away {
-            players {
-              playerNumber
-              player {
-                ... on DiscoverParticipant { id }
-                ... on DiscoverAnonymousParticipant { id name }
-                ... on DiscoverRegularFillInPlayer { id name }
-                ... on DiscoverGamePermitFillInPlayer { id }
-                ... on DiscoverParticipantFillInPlayer { id }
-              }
-              statistics { count type { value label } }
-            }
-            bestPlayers {
-              ranking
-              participant {
-                ... on DiscoverParticipant { id }
-                ... on DiscoverAnonymousParticipant { id name }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}
-"""
-
-PROFILE_QUERY = """
-query($participantID: ID!) {
-  discoverParticipant(participantID: $participantID) {
-    profile { firstName lastName }
-  }
-}
-"""
+    <span style="color:#999;font-size:0.78rem;margin-left:0.5rem;">Paste into Excel or Google Sheets with Ctrl+V</span>
+    """, height=46)
 
 def safe_post(payload):
     try:
