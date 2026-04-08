@@ -112,6 +112,87 @@ def copy_button(df, key: str, label: str = "Copy Table"):
     <span style="color:#999;font-size:0.78rem;margin-left:0.5rem;">Paste into Excel or Google Sheets with Ctrl+V</span>
     """, height=46)
 
+# --------------------------------------------------
+# PLAYHQ
+# --------------------------------------------------
+PLAYHQ_URL = "https://api.playhq.com/graphql"
+HEADERS = {
+    "User-Agent": "Mozilla/5.0",
+    "Content-Type": "application/json",
+    "Origin": "https://www.playhq.com",
+    "Referer": "https://www.playhq.com/",
+    "tenant": "afl"
+}
+
+STATS_QUERY = """
+query($gradeID: ID!) {
+  discoverGrade(gradeID: $gradeID) {
+    rounds {
+      id
+      name
+      number
+      games {
+        id
+        date
+        status { value }
+        home { ... on DiscoverTeam { id name } }
+        away { ... on DiscoverTeam { id name } }
+        statistics {
+          home {
+            players {
+              playerNumber
+              player {
+                ... on DiscoverParticipant { id }
+                ... on DiscoverAnonymousParticipant { id name }
+                ... on DiscoverRegularFillInPlayer { id name }
+                ... on DiscoverGamePermitFillInPlayer { id }
+                ... on DiscoverParticipantFillInPlayer { id }
+              }
+              statistics { count type { value label } }
+            }
+            bestPlayers {
+              ranking
+              participant {
+                ... on DiscoverParticipant { id }
+                ... on DiscoverAnonymousParticipant { id name }
+              }
+            }
+          }
+          away {
+            players {
+              playerNumber
+              player {
+                ... on DiscoverParticipant { id }
+                ... on DiscoverAnonymousParticipant { id name }
+                ... on DiscoverRegularFillInPlayer { id name }
+                ... on DiscoverGamePermitFillInPlayer { id }
+                ... on DiscoverParticipantFillInPlayer { id }
+              }
+              statistics { count type { value label } }
+            }
+            bestPlayers {
+              ranking
+              participant {
+                ... on DiscoverParticipant { id }
+                ... on DiscoverAnonymousParticipant { id name }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
+PROFILE_QUERY = """
+query($participantID: ID!) {
+  discoverParticipant(participantID: $participantID) {
+    profile { firstName lastName }
+  }
+}
+"""
+
 def safe_post(payload):
     try:
         r = requests.post(PLAYHQ_URL, headers=HEADERS, json=payload, timeout=30)
